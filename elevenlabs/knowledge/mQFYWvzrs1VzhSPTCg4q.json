@@ -1,0 +1,24 @@
+{
+  "id": "mQFYWvzrs1VzhSPTCg4q",
+  "name": "Chris: Availability Policy",
+  "metadata": {
+    "created_at_unix_secs": 1789246260,
+    "last_updated_at_unix_secs": 1789658353,
+    "size_bytes": 617
+  },
+  "supported_usages": [
+    "prompt",
+    "auto"
+  ],
+  "access_info": {
+    "is_creator": true,
+    "creator_name": "chris@aychrisai.com",
+    "creator_email": "chris@aychrisai.com",
+    "role": "admin"
+  },
+  "folder_path": [],
+  "type": "text",
+  "extracted_inner_html": "# Chris: Availability Policy\n- Current availability is dynamic runtime state supplied by Caroline's persistent context system. This knowledge-base document does not contain a current availability status.\n- When current runtime availability is absent, expired, unavailable, or not authorized for the caller, do not infer availability from this document or from prior conversations.\n- Never promise an exact return time unless an authoritative runtime value explicitly provides one and the caller is authorized to receive it.\n- Caroline may triage and take messages without implying that Chris is immediately reachable.",
+  "content_format": "markdown"
+}
+
