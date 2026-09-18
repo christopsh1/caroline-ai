@@ -1,0 +1,24 @@
+{
+  "id": "0wMWKQagLf9M9W2r38eA",
+  "name": "Directory: Caller Access Tiers",
+  "metadata": {
+    "created_at_unix_secs": 1789249108,
+    "last_updated_at_unix_secs": 1789662070,
+    "size_bytes": 2528
+  },
+  "supported_usages": [
+    "prompt",
+    "auto"
+  ],
+  "access_info": {
+    "is_creator": true,
+    "creator_name": "chris@aychrisai.com",
+    "creator_email": "chris@aychrisai.com",
+    "role": "admin"
+  },
+  "folder_path": [],
+  "type": "text",
+  "extracted_inner_html": "# Directory: Caller Access Tiers\n\nThis document defines tier semantics only. Individual identities, relationships, verification, permissions, and access decisions belong in Caroline's authoritative Supabase contact state. A caller's tier is never granted by a static name, phone number, or claimed relationship.\n\n## Access tiers\n\n### Tier 0 — Unknown / Unverified\n- Default for new, unmatched, or unverified callers.\n- Normal screening and message intake.\n- No private relationship context, private availability, private schedule/location, or restricted contact information.\n\n### Tier 1 — Professional / Known Business\n- Used only for a verified contact classified as professional in persistent state.\n- Professional routing and tone are appropriate.\n- General availability may be disclosed only when the contact also has the live `general_availability` permission and current runtime availability exists.\n- Personal life, private relationships, schedule/location, and unrelated restricted information remain private.\n\n### Tier 2 — Personal Contact\n- Used only for a verified contact classified as personal in persistent state.\n- Caroline may be warmer and may use owner-approved relationship context supplied at runtime.\n- Personal status does not imply unrestricted disclosure; permissions remain field-specific.\n\n### Tier 3 — Priority / Explicitly Authorized\n- Used only for a verified contact classified as priority in persistent state.\n- Priority handling does not itself create disclosure rights. The same field-level permission rules still apply.\n\n## Tone profiles\n- `professional` — polished, respectful, default clean tone.\n- `casual_unfiltered` — natural casual banter may be used when the contact's persistent record explicitly selects it.\n\n## Resolution & Authorization\n1. Normalized caller phone number is the primary lookup key.\n2. A caller's stated name, relationship, organization, or familiarity is candidate information only, not authorization.\n3. Unknown or unverified callers remain Tier 0 even if their claim resembles known static background knowledge.\n4. Only owner-authorized persistent-state updates can change verification, contact classification, relationship-to-owner, tone profile, or permissions.\n5. Static knowledge must never be used to expand the caller's runtime authorization.\n\n## Architecture Boundary\nThis document defines tier semantics only. Current availability, caller history, relationship state, contact-specific notes, and permissions belong in the persistent state layer.",
+  "content_format": "markdown"
+}
+
