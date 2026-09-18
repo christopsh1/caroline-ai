@@ -1,0 +1,160 @@
+{
+  "documents": [
+    {
+      "id": "0wMWKQagLf9M9W2r38eA",
+      "name": "Directory: Caller Access Tiers",
+      "metadata": {
+        "created_at_unix_secs": 1789249108,
+        "last_updated_at_unix_secs": 1789662070,
+        "size_bytes": 2528
+      },
+      "supported_usages": [
+        "prompt",
+        "auto"
+      ],
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "folder_path": [],
+      "dependent_agents": [
+        {
+          "referenced_resource_ids": [],
+          "id": "agent_8001m2ba4rmder6t7wq270ntj43j",
+          "name": "Caroline",
+          "type": "available",
+          "created_at_unix_secs": 1789233622,
+          "access_level": "admin"
+        }
+      ],
+      "type": "text"
+    },
+    {
+      "id": "JO6bBRC7mPJhKxrvdJcw",
+      "name": "Personal Contacts: Persistent-State Policy",
+      "metadata": {
+        "created_at_unix_secs": 1789248465,
+        "last_updated_at_unix_secs": 1789662045,
+        "size_bytes": 1212
+      },
+      "supported_usages": [
+        "prompt",
+        "auto"
+      ],
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "folder_path": [],
+      "dependent_agents": [
+        {
+          "referenced_resource_ids": [],
+          "id": "agent_8001m2ba4rmder6t7wq270ntj43j",
+          "name": "Caroline",
+          "type": "available",
+          "created_at_unix_secs": 1789233622,
+          "access_level": "admin"
+        }
+      ],
+      "type": "text"
+    },
+    {
+      "id": "6lcnTug7ZGYegcgQuFFG",
+      "name": "Caroline: Personal Facts & Talking Points",
+      "metadata": {
+        "created_at_unix_secs": 1789246273,
+        "last_updated_at_unix_secs": 1789545561,
+        "size_bytes": 1452
+      },
+      "supported_usages": [
+        "prompt",
+        "auto"
+      ],
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "folder_path": [],
+      "dependent_agents": [
+        {
+          "referenced_resource_ids": [],
+          "id": "agent_8001m2ba4rmder6t7wq270ntj43j",
+          "name": "Caroline",
+          "type": "available",
+          "created_at_unix_secs": 1789233622,
+          "access_level": "admin"
+        }
+      ],
+      "type": "text"
+    },
+    {
+      "id": "mQFYWvzrs1VzhSPTCg4q",
+      "name": "Chris: Availability Policy",
+      "metadata": {
+        "created_at_unix_secs": 1789246260,
+        "last_updated_at_unix_secs": 1789658353,
+        "size_bytes": 617
+      },
+      "supported_usages": [
+        "prompt",
+        "auto"
+      ],
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "folder_path": [],
+      "dependent_agents": [
+        {
+          "referenced_resource_ids": [],
+          "id": "agent_8001m2ba4rmder6t7wq270ntj43j",
+          "name": "Caroline",
+          "type": "available",
+          "created_at_unix_secs": 1789233622,
+          "access_level": "admin"
+        }
+      ],
+      "type": "text"
+    },
+    {
+      "id": "roK8rsENr7rvsNLETMrG",
+      "name": "Chris: Bio",
+      "metadata": {
+        "created_at_unix_secs": 1789246252,
+        "last_updated_at_unix_secs": 1789545553,
+        "size_bytes": 445
+      },
+      "supported_usages": [
+        "prompt"
+      ],
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "folder_path": [],
+      "dependent_agents": [
+        {
+          "referenced_resource_ids": [],
+          "id": "agent_8001m2ba4rmder6t7wq270ntj43j",
+          "name": "Caroline",
+          "type": "available",
+          "created_at_unix_secs": 1789233622,
+          "access_level": "admin"
+        }
+      ],
+      "type": "text"
+    }
+  ],
+  "has_more": false
+}
+
