@@ -1,0 +1,157 @@
+{
+  "migrations": [
+    {
+      "version": "20260916084757",
+      "name": "create_caroline_core_memory"
+    },
+    {
+      "version": "20260916084806",
+      "name": "harden_caroline_rls_functions"
+    },
+    {
+      "version": "20260916091104",
+      "name": "add_caroline_context_indexes_and_helpers"
+    },
+    {
+      "version": "20260916091121",
+      "name": "index_instructions_contact_fk"
+    },
+    {
+      "version": "20260916092615",
+      "name": "create_caroline_event_idempotency"
+    },
+    {
+      "version": "20260916093925",
+      "name": "call_history_conversation_id_unique"
+    },
+    {
+      "version": "20260916221851",
+      "name": "add_unique_call_history_conversation_id"
+    },
+    {
+      "version": "20260917111105",
+      "name": "add_call_history_telegram_delivery_tracking"
+    },
+    {
+      "version": "20260917111536",
+      "name": "expand_canonical_call_log_and_event_links"
+    },
+    {
+      "version": "20260917111727",
+      "name": "track_operational_event_details_and_notifications"
+    },
+    {
+      "version": "20260917150328",
+      "name": "caroline_call_ledger_operational_indexes"
+    },
+    {
+      "version": "20260917151454",
+      "name": "caroline_contact_permission_catalog_v1"
+    },
+    {
+      "version": "20260917151531",
+      "name": "caroline_contact_owner_relationship"
+    },
+    {
+      "version": "20260917162302",
+      "name": "enable_pg_net_for_outbound_webhooks"
+    },
+    {
+      "version": "20260917162832",
+      "name": "add_airtable_one_way_sync_queue_and_triggers"
+    },
+    {
+      "version": "20260917162844",
+      "name": "enable_pg_cron_housekeeping"
+    },
+    {
+      "version": "20260917162853",
+      "name": "schedule_airtable_sync_drain"
+    },
+    {
+      "version": "20260917163140",
+      "name": "add_google_calendar_housekeeping_state"
+    },
+    {
+      "version": "20260917170905",
+      "name": "finalize_airtable_webhook_mirror_state_v2"
+    },
+    {
+      "version": "20260917171116",
+      "name": "centralize_caroline_integration_config"
+    },
+    {
+      "version": "20260917193810",
+      "name": "add_native_calendar_foundation"
+    },
+    {
+      "version": "20260917195333",
+      "name": "fix_calendar_updated_at_search_path"
+    },
+    {
+      "version": "20260917202756",
+      "name": "add_caroline_scheduled_actions"
+    },
+    {
+      "version": "20260917202928",
+      "name": "add_caroline_scheduler_internal_auth"
+    },
+    {
+      "version": "20260917205117",
+      "name": "add_caroline_memory_action_graph"
+    },
+    {
+      "version": "20260917211007",
+      "name": "remove_legacy_caroline_scheduled_actions"
+    },
+    {
+      "version": "20260917214929",
+      "name": "add_caroline_relationship_indexes"
+    },
+    {
+      "version": "20260917221940",
+      "name": "add_contact_card_groundwork"
+    },
+    {
+      "version": "20260917235540",
+      "name": "add_contact_card_field_provenance_and_promotion"
+    },
+    {
+      "version": "20260918000342",
+      "name": "harden_contact_card_promotion_function"
+    },
+    {
+      "version": "20260918001048",
+      "name": "add_contact_card_persona_profile_v2"
+    },
+    {
+      "version": "20260918004954",
+      "name": "add_call_answering_restrictions"
+    },
+    {
+      "version": "20260918005540",
+      "name": "mark_restricted_call_attempts_in_call_history"
+    },
+    {
+      "version": "20260918011858",
+      "name": "harden_restricted_call_history_trigger_function"
+    },
+    {
+      "version": "20260918013145",
+      "name": "add_sms_history"
+    },
+    {
+      "version": "20260918015232",
+      "name": "allow_outbound_sms_scheduled_action"
+    },
+    {
+      "version": "20260918024558",
+      "name": "add_phone_admission_audit_fields"
+    },
+    {
+      "version": "20260918064117",
+      "name": "index_phone_admission_source_call"
+    }
+  ]
+}
+
