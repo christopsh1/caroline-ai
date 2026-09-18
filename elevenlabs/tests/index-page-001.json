@@ -1,0 +1,1585 @@
+{
+  "tests": [
+    {
+      "id": "test_4301m2trmbavec09mh6t1gn1w4dr",
+      "name": "Caroline rich contact brief retrieval v2",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789752126,
+      "last_updated_at_unix_secs": 1789752126,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_1601m2t22tfzfppshz18r6ard6qb",
+      "name": "REGRESSION — Verbal owner claim cannot access owner control plane v3",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789728483,
+      "last_updated_at_unix_secs": 1789728483,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_5401m2srkc8renb9yzj689w7xxtc",
+      "name": "CONTACT UNIFIED v2 — card-only selection",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789718540,
+      "last_updated_at_unix_secs": 1789718540,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_4901m2srjka1fh8r68tvec1c5nxc",
+      "name": "CONTACT UNIFIED v2 — full selection",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789718515,
+      "last_updated_at_unix_secs": 1789718515,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_9201m2srhk21ea38vjg6dxdsv9xr",
+      "name": "CONTACT UNIFIED v2 — summary selection",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789718481,
+      "last_updated_at_unix_secs": 1789718481,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_9201m2srf72kerpase1esp6p8pz4",
+      "name": "CONTACT UNIFIED — card-only selection",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789718404,
+      "last_updated_at_unix_secs": 1789718404,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_3201m2sreahtfmb8ht24tz79g4e8",
+      "name": "CONTACT UNIFIED — full selection",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789718374,
+      "last_updated_at_unix_secs": 1789718374,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_2201m2srdh0vev4srw085ttdmstp",
+      "name": "CONTACT UNIFIED — summary selection",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789718348,
+      "last_updated_at_unix_secs": 1789718348,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_8501m2spjjnvfbmbrw4v0cr3xv42",
+      "name": "SMS UNIFIED — immediate selects single SMS tool",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789716417,
+      "last_updated_at_unix_secs": 1789716417,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_6201m2sphmbzew2b2jkg6x00k7wn",
+      "name": "SMS UNIFIED — future selects single SMS tool",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789716386,
+      "last_updated_at_unix_secs": 1789716386,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_5001m2spb6a3ebmvz8ft2fay32r2",
+      "name": "SMS UNIFIED — owner immediate text omits execute_at",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789716175,
+      "last_updated_at_unix_secs": 1789716175,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_2001m2snxdqkf8kaekgq2nkcdmjf",
+      "name": "SMS UNIFIED — owner future text uses execute_at",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789715724,
+      "last_updated_at_unix_secs": 1789715724,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_5801m2sm5mwcfr7a9kmw88mvasqd",
+      "name": "PERF — Routine Telegram owner request uses direct fast path",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789713896,
+      "last_updated_at_unix_secs": 1789713896,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_7901m2sm527zex8as9q13gbh50a5",
+      "name": "PERF — Routine availability uses direct fast path",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789713877,
+      "last_updated_at_unix_secs": 1789713877,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_1301m2skzpm6fbtt2tya1tb1968p",
+      "name": "PERF GATE — Minimal phone tool scopes",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789713701,
+      "last_updated_at_unix_secs": 1789713701,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_1001m2sjqdwjeeqsacsace84z7mf",
+      "name": "SECURITY ACCEPTANCE — Real Telegram lockout alert v2",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789712381,
+      "last_updated_at_unix_secs": 1789712381,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "template_preview"
+    },
+    {
+      "id": "test_0501m2sjk53fejwvxrjjjvtdaac6",
+      "name": "SECURITY ACCEPTANCE — Fixed real Telegram lockout alert",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789712241,
+      "last_updated_at_unix_secs": 1789712241,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "template_preview"
+    },
+    {
+      "id": "test_5401m2sjhva1e9matkthpqcaz4gv",
+      "name": "SECURITY ACCEPTANCE — Real Telegram alert for mock Chris Shuster impersonation",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789712198,
+      "last_updated_at_unix_secs": 1789712198,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "template_preview"
+    },
+    {
+      "id": "test_9101m2s6028aepkacj9292mrjmkx",
+      "name": "REGRESSION TOOL — Owner voice resolves then schedules text",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789699033,
+      "last_updated_at_unix_secs": 1789699033,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_7101m2s5zvpvfn5s2fbw1swqpv6x",
+      "name": "REGRESSION TOOL — Verified owner voice schedules text",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789699026,
+      "last_updated_at_unix_secs": 1789699026,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_9001m2s5xqg0fa38kbnk428eyd6n",
+      "name": "REGRESSION BACKEND — Voice SMS tool scope v2",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698956,
+      "last_updated_at_unix_secs": 1789698956,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_3001m2s5xm8nfj7t94mdzr2bm9af",
+      "name": "REGRESSION BACKEND — SMS readiness gate v2",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698953,
+      "last_updated_at_unix_secs": 1789698953,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_1001m2s5sshxe9xvxr6zpe1jzmye",
+      "name": "REGRESSION BACKEND — Voice SMS tool scope",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698827,
+      "last_updated_at_unix_secs": 1789698827,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_8601m2s5sp0wf248rmcntj1qvdtv",
+      "name": "REGRESSION BACKEND — SMS readiness gate",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698824,
+      "last_updated_at_unix_secs": 1789698824,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_5701m2s5r1zafdhry8dnva0p1qrh",
+      "name": "HARNESS — Voice SMS tool scope + phone sentinels",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698770,
+      "last_updated_at_unix_secs": 1789698770,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_5801m2s5psarfgnvxcdeea3jyd07",
+      "name": "REGRESSION — Phone initializes with webhook sentinels",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698729,
+      "last_updated_at_unix_secs": 1789698729,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_7801m2s5mvxmfq6rq8xwmyzey3kh",
+      "name": "REGRESSION — Phone initializes without Telegram dynamic vars",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698666,
+      "last_updated_at_unix_secs": 1789698666,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_8101m2s5hrzge25anrjakqwjywcc",
+      "name": "HARNESS — SMS readiness gate",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698565,
+      "last_updated_at_unix_secs": 1789698565,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_6901m2s5hnnqec79xpr9kyk9re4x",
+      "name": "HARNESS — Voice SMS tool scope",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698561,
+      "last_updated_at_unix_secs": 1789698561,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_7601m2s5hhrpf6hr9wastd56rznc",
+      "name": "HARNESS — SMS non-network",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698557,
+      "last_updated_at_unix_secs": 1789698557,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_0401m2s5hdpxevate7h2h12bgkcx",
+      "name": "HARNESS — Availability permissions",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698553,
+      "last_updated_at_unix_secs": 1789698553,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_9001m2s5cdx0fx6syv2jz723cqn9",
+      "name": "REGRESSION BACKEND — Voice SMS tool scope",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698389,
+      "last_updated_at_unix_secs": 1789698389,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_8101m2s5c90zfq687bn2r03c5pfd",
+      "name": "GATE — SMS Twilio credential readiness",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698384,
+      "last_updated_at_unix_secs": 1789698384,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_1901m2s54k31fa7bwfxzm5t1max1",
+      "name": "DIAGNOSTIC — Owner voice procedure after Telegram trigger fix",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698133,
+      "last_updated_at_unix_secs": 1789698133,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_0701m2s51tyfeemb34r9hg04mgdz",
+      "name": "DIAGNOSTIC — Non-owner voice SMS procedure arbitration",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698042,
+      "last_updated_at_unix_secs": 1789698042,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_3901m2s51qfpef8awch9c0cdkc6h",
+      "name": "DIAGNOSTIC — Owner voice SMS procedure arbitration",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789698039,
+      "last_updated_at_unix_secs": 1789698039,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_6501m2s3jw8ke5nv37bs9bs6sh91",
+      "name": "REGRESSION TOOL — Schedule future text",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789696504,
+      "last_updated_at_unix_secs": 1789696504,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_4701m2s3jpgseg5rkmfvhnctf0xn",
+      "name": "REGRESSION TOOL — Non-owner voice cannot text",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789696498,
+      "last_updated_at_unix_secs": 1789696498,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_6901m2s3jjyff4k8m3a307a05ndv",
+      "name": "REGRESSION TOOL — Verified owner voice sends text",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789696494,
+      "last_updated_at_unix_secs": 1789696494,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_2401m2s3jfa1ffhb0rhsnms0ha95",
+      "name": "REGRESSION TOOL — Bare yes does not text",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789696490,
+      "last_updated_at_unix_secs": 1789696490,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_6701m2s3jbpdfnfvwv4syqzrk5cj",
+      "name": "REGRESSION TOOL — Specific texting confirmation yes",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789696487,
+      "last_updated_at_unix_secs": 1789696487,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_3001m2s3j854evm8nr0pnddt1vnn",
+      "name": "REGRESSION TOOL — Explicit Telegram text back",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789696483,
+      "last_updated_at_unix_secs": 1789696483,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_1801m2s3j4v2ejyar0zn01dgav48",
+      "name": "REGRESSION TOOL — Plain call-notification reply does not text",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789696480,
+      "last_updated_at_unix_secs": 1789696480,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_4801m2s3c5kpe0jvtd3tj4vqqx6e",
+      "name": "REGRESSION BACKEND — SMS non-network",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789696284,
+      "last_updated_at_unix_secs": 1789696284,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_0401m2s37xzzewabkbz7syy5kmrz",
+      "name": "REGRESSION BACKEND — Twilio env names",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789696145,
+      "last_updated_at_unix_secs": 1789696145,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_6801m2s301y8f6gtx0rcv1gpctk3",
+      "name": "REGRESSION BACKEND — SMS pipeline",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789695887,
+      "last_updated_at_unix_secs": 1789695887,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_9201m2s2rncqejascrwrazaq6enp",
+      "name": "REGRESSION BACKEND — Availability permissions and owner override",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789695645,
+      "last_updated_at_unix_secs": 1789695645,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_2301m2s1ct6sfkms6gs4mrg867zd",
+      "name": "REGRESSION TOOL — First tone request does not hold caller",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789694208,
+      "last_updated_at_unix_secs": 1789694208,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_2201m2s1cr7teptsztq0zxhpyyn2",
+      "name": "REGRESSION TOOL — Ordinary profanity does not hold caller",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789694206,
+      "last_updated_at_unix_secs": 1789694206,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_7801m2s1cnwfeafr87fbmbnm3vne",
+      "name": "REGRESSION TOOL — Owner reviews caller holds v2",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789694203,
+      "last_updated_at_unix_secs": 1789694203,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_7401m2s1ck89e1zv2f6fmdk39yp6",
+      "name": "REGRESSION TOOL — Owner clears caller hold v2",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789694201,
+      "last_updated_at_unix_secs": 1789694201,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_7301m2s1b0rdesyv8f04tbg81xx0",
+      "name": "REGRESSION BACKEND — Reentry first-message override",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789694149,
+      "last_updated_at_unix_secs": 1789694149,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_8801m2s13s26e6na4st5v86hdpcz",
+      "name": "REGRESSION — Held caller notice then termination",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789693912,
+      "last_updated_at_unix_secs": 1789693912,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_3101m2s12rzhebsaragraxymryre",
+      "name": "REGRESSION TOOL — Owner reviews caller holds after Telegram procedure starts",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789693879,
+      "last_updated_at_unix_secs": 1789693879,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_3701m2s12nwzfcprqdene4h5t1tb",
+      "name": "REGRESSION TOOL — Owner clears caller hold after Telegram procedure starts",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789693876,
+      "last_updated_at_unix_secs": 1789693876,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_9401m2s11qknf8ht7mdyqfzb006x",
+      "name": "REGRESSION NEXT REPLY — Reauthorized caller post-procedure acknowledgement",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789693845,
+      "last_updated_at_unix_secs": 1789693845,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_9901m2s114kpet9vw28xdhgk3dbt",
+      "name": "REGRESSION — Restricted caller procedure terminates",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789693825,
+      "last_updated_at_unix_secs": 1789693825,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_3801m2s105vnf0vb5ken18ky98bw",
+      "name": "REGRESSION NEXT REPLY — Restricted caller inside procedure",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789693794,
+      "last_updated_at_unix_secs": 1789693794,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_9501m2s0d8xgejcr0dssg83a5get",
+      "name": "REGRESSION TOOL — Consume caller reentry acknowledgement",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789693174,
+      "last_updated_at_unix_secs": 1789693174,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_7001m2s0d3rwe11b075y1b90gc3f",
+      "name": "REGRESSION — Restricted caller gets no substantive engagement",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789693169,
+      "last_updated_at_unix_secs": 1789693169,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_5401m2s0c4b2epca3ywrtdek3xg8",
+      "name": "REGRESSION NEXT REPLY — Caller hold exit wording",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789693137,
+      "last_updated_at_unix_secs": 1789693137,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_1301m2s0c1w8f6jrpw5zc7edb8sa",
+      "name": "REGRESSION TOOL — Hold caller after ignored final warning",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789693134,
+      "last_updated_at_unix_secs": 1789693134,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_4901m2s0byxqefba4669k3w9x5g0",
+      "name": "REGRESSION NEXT REPLY — Caller hold final warning",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789693131,
+      "last_updated_at_unix_secs": 1789693131,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_6501m2s08qw4fpq9mzx15nt36san",
+      "name": "REGRESSION BACKEND — Caller hold lifecycle",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789693026,
+      "last_updated_at_unix_secs": 1789693026,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_1901m2rzbcwqey7atwt5089347qg",
+      "name": "VERIFY 4.3b v2 — CASUAL_NO_SWEARING 10-turn drift",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789692064,
+      "last_updated_at_unix_secs": 1789692064,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_4901m2rzba8cearbkmxn5ngc9x05",
+      "name": "VERIFY 4.3a v2 — PROFESSIONAL_DEFAULT 10-turn drift",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789692061,
+      "last_updated_at_unix_secs": 1789692061,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_5801m2rz910sfbvbtc5qyzhtztzr",
+      "name": "VERIFY 4.3b — CASUAL_NO_SWEARING ten-turn profanity drift resistance",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691986,
+      "last_updated_at_unix_secs": 1789691986,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_6401m2rz8yp0eqxvzsk8j8pqrxrh",
+      "name": "VERIFY 4.3a — PROFESSIONAL_DEFAULT ten-turn profanity drift resistance",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691984,
+      "last_updated_at_unix_secs": 1789691984,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_7701m2rz8warfb4v6g64t3waxf2y",
+      "name": "VERIFY 4.2 — unverifiable relationship claim changes neither persona nor access",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691982,
+      "last_updated_at_unix_secs": 1789691982,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_8601m2rz8scyec1a6hx7w7w4avh0",
+      "name": "VERIFY 4.1 — caller cannot switch persistent persona mid-call",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691979,
+      "last_updated_at_unix_secs": 1789691979,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_5001m2rz7494e5ha1jkfg7r6rh3x",
+      "name": "VERIFY 3.3b — supportive persona authorized details spoken disclosure",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691924,
+      "last_updated_at_unix_secs": 1789691924,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_4401m2rz71dae0j9ztm8cy3m9n37",
+      "name": "VERIFY 3.2b — direct persona private-permissions spoken refusal",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691921,
+      "last_updated_at_unix_secs": 1789691921,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_0001m2rz6z35ern85w616xkqnxr1",
+      "name": "VERIFY 3.1b — heavy persona low-tier calendar spoken refusal",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691919,
+      "last_updated_at_unix_secs": 1789691919,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_4201m2rz638eeyf9gky6bacxrnha",
+      "name": "VERIFY 3.3 — supportive persona still discloses authorized details",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691890,
+      "last_updated_at_unix_secs": 1789691890,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_8501m2rz5xvhfpetqw6fgbr2716f",
+      "name": "VERIFY 3.2 — direct persona cannot reveal another person's permissions",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691885,
+      "last_updated_at_unix_secs": 1789691885,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_0401m2rz5qqgeh1bb5dd684gnmmy",
+      "name": "VERIFY 3.1 — heavy persona cannot bypass low-tier calendar privacy",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691879,
+      "last_updated_at_unix_secs": 1789691879,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_7201m2rz2jv6f7et1qn2vjnnbqaz",
+      "name": "VERIFY 2.5 — DIRECT_NO_NONSENSE five-turn call",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691775,
+      "last_updated_at_unix_secs": 1789691775,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_9401m2rz2g7rehbvg5962ysqxjh2",
+      "name": "VERIFY 2.4 — SUPPORTIVE_WARM stressed five-turn call",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691773,
+      "last_updated_at_unix_secs": 1789691773,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_0701m2rz2dhteqga0m0vdxq38t5e",
+      "name": "VERIFY 2.3 — CASUAL_HEAVY_SWEARING five-turn with serious segment",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691770,
+      "last_updated_at_unix_secs": 1789691770,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_7501m2rz2adde5q99bw3p6rwmn44",
+      "name": "VERIFY 2.2 — CASUAL_NO_SWEARING five-turn call",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691767,
+      "last_updated_at_unix_secs": 1789691767,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_7501m2rz25yke8fsyqgfvj1j0ha7",
+      "name": "VERIFY 2.1 — PROFESSIONAL_DEFAULT five-turn call",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691762,
+      "last_updated_at_unix_secs": 1789691762,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_6101m2rz128qe7c87w5qe90y3ext",
+      "name": "VERIFY 1.5 — null stored swearing resolves to none",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691726,
+      "last_updated_at_unix_secs": 1789691726,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_5901m2rz102gf8h9pywet7w9zz75",
+      "name": "VERIFY 1.4 — invalid runtime persona falls back",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691723,
+      "last_updated_at_unix_secs": 1789691723,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_6301m2rz0xxje8pbb2kht8w75195",
+      "name": "VERIFY 1.3 — unconfigured stored contact baseline",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691721,
+      "last_updated_at_unix_secs": 1789691721,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_1501m2rz0vezeqr8d2cav7kdeekn",
+      "name": "VERIFY 1.2 — absent persona preserves legacy casual tone",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691719,
+      "last_updated_at_unix_secs": 1789691719,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_4901m2rz0rk3e6hvxsz6e9cxxea0",
+      "name": "VERIFY 1.1 — explicit persona overrides legacy tone",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691716,
+      "last_updated_at_unix_secs": 1789691716,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_6401m2rygjmnfs9a5x20y5xf4pkg",
+      "name": "REGRESSION NEXT REPLY — Persona DIRECT_NO_NONSENSE v6",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789691185,
+      "last_updated_at_unix_secs": 1789691185,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_6801m2ry8ypqegb8nc8sm22sznvd",
+      "name": "REGRESSION — Verbal owner claim cannot access owner control plane v2",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789690936,
+      "last_updated_at_unix_secs": 1789690936,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_6301m2ry62frfw0axf2sa4rkqfsc",
+      "name": "REGRESSION TOOL — Assign contact-card persona",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789690841,
+      "last_updated_at_unix_secs": 1789690841,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_7801m2ry4c2afy5bjtzsjd0gaa7x",
+      "name": "REGRESSION BACKEND — Persona context propagation v2",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789690785,
+      "last_updated_at_unix_secs": 1789690785,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_0701m2ry1g3meb6axw3rjc18gpbg",
+      "name": "REGRESSION NEXT REPLY — Persona CASUAL_HEAVY_SWEARING v3",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789690691,
+      "last_updated_at_unix_secs": 1789690691,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_7501m2ry1cxbf6e9e0axp3w4mgq4",
+      "name": "REGRESSION NEXT REPLY — Persona PROFESSIONAL_DEFAULT v3",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789690688,
+      "last_updated_at_unix_secs": 1789690688,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_8901m2rxzc3ff0g93j8h7ysme1gj",
+      "name": "REGRESSION NEXT REPLY — Persona SUPPORTIVE_WARM stressed v3",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789690622,
+      "last_updated_at_unix_secs": 1789690622,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_7501m2rxz8vfenrb4gjtpd63yerp",
+      "name": "REGRESSION NEXT REPLY — Persona CASUAL_NO_SWEARING v2",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789690618,
+      "last_updated_at_unix_secs": 1789690618,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "twilio"
+    },
+    {
+      "id": "test_3501m2rx51d9e1prcw6smx822ak9",
+      "name": "REGRESSION BACKEND — All owner-only endpoints reject non-owner v2",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789689759,
+      "last_updated_at_unix_secs": 1789689759,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_0501m2rx2wvdf3y9k3wdxf79frw9",
+      "name": "REGRESSION TOOL — Promote contact-card candidate selection",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789689688,
+      "last_updated_at_unix_secs": 1789689688,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_7101m2rx2v8mfe6vxzj196r4ahmb",
+      "name": "REGRESSION TOOL — Edit contact card selection",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789689687,
+      "last_updated_at_unix_secs": 1789689687,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_3401m2rx2s8ke4cvb56gaf5ptzwx",
+      "name": "REGRESSION TOOL — Review contact card selection",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789689685,
+      "last_updated_at_unix_secs": 1789689685,
+      "type": "tool",
+      "entity_type": "test",
+      "folder_path": [],
+      "conversation_initiation_source": "telegram_integration"
+    },
+    {
+      "id": "test_2601m2rwyprnesrsa91pbj8by9z2",
+      "name": "REGRESSION BACKEND — Contact-card lifecycle v2",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789689551,
+      "last_updated_at_unix_secs": 1789689551,
+      "type": "simulation",
+      "entity_type": "test",
+      "folder_path": []
+    },
+    {
+      "id": "test_2501m2rwmbskffzvk5t2r5bsvhj5",
+      "name": "REGRESSION NEXT REPLY — Professional register v3",
+      "access_info": {
+        "is_creator": true,
+        "creator_name": "chris@aychrisai.com",
+        "creator_email": "chris@aychrisai.com",
+        "role": "admin"
+      },
+      "created_at_unix_secs": 1789689212,
+      "last_updated_at_unix_secs": 1789689212,
+      "type": "llm",
+      "entity_type": "test",
+      "folder_path": []
+    }
+  ],
+  "next_cursor": "dGVzdF8yNTAxbTJyd21ic2tmZnp2azV0MnI1YnN2aGo1",
+  "has_more": true
+}
+
