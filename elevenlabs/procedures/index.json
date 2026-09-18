@@ -1,0 +1,137 @@
+{
+  "procedures": [
+    {
+      "procedure_id": "agtprc_1101m2bm5e2yfrvsxfkjtgrbbd5j",
+      "version_id": "agtprcv_9001m2s0s6brew5a89hed4bp16vc",
+      "name": "Alternate Contact Requests",
+      "type": "free_form",
+      "trigger": "Caller asks for Chris's direct number, another number, an alternate emergency number, or another way to reach him outside the main line.",
+      "has_draft": false,
+      "referenced_tool_ids": [],
+      "referenced_kb_ids": [],
+      "referenced_procedure_ids": [],
+      "referenced_dynamic_variables": [
+        "call_answering_status",
+        "call_reentry_notice_pending"
+      ]
+    },
+    {
+      "procedure_id": "agtprc_5901m2bm5e3jf5c9anzt61t2a26a",
+      "version_id": "agtprcv_5701m2s0s6bwfjkaj4zxk8f1ya1z",
+      "name": "Handle supervisor, employer, or professional contact calls",
+      "type": "free_form",
+      "trigger": "Caller identifies as a supervisor, employer, or professional contact following up on Chris's current employment or availability for work.",
+      "has_draft": false,
+      "referenced_tool_ids": [],
+      "referenced_kb_ids": [],
+      "referenced_procedure_ids": [],
+      "referenced_dynamic_variables": [
+        "call_answering_status",
+        "call_reentry_notice_pending"
+      ]
+    },
+    {
+      "procedure_id": "agtprc_9001m2bm5e3te1gvkcahe3gntdnt",
+      "version_id": "agtprcv_4901m2s0s6c1e0m8256rv0r1bc3f",
+      "name": "Hostile or Abusive Caller De-escalation",
+      "type": "free_form",
+      "trigger": "Caller becomes hostile, abusive, aggressive, or is swearing at the agent directly rather than just using casual profanity in conversation.",
+      "has_draft": false,
+      "referenced_tool_ids": [],
+      "referenced_kb_ids": [],
+      "referenced_procedure_ids": [],
+      "referenced_dynamic_variables": [
+        "call_answering_status",
+        "call_reentry_notice_pending"
+      ]
+    },
+    {
+      "procedure_id": "agtprc_2001m2bm5e43e9m9075r9s873hs8",
+      "version_id": "agtprcv_7301m2snqhk0ek2svgvtbhsfytk4",
+      "name": "Bio and Availability Disclosure",
+      "type": "free_form",
+      "trigger": "",
+      "has_draft": false,
+      "referenced_tool_ids": [],
+      "referenced_kb_ids": [],
+      "referenced_procedure_ids": [],
+      "referenced_dynamic_variables": [
+        "call_answering_status",
+        "call_reentry_notice_pending"
+      ]
+    },
+    {
+      "procedure_id": "agtprc_1601m2bm5e4be4mavend4s0s4nv4",
+      "version_id": "agtprcv_2401m2snqhk6f8bbbtk1rpw6ahhs",
+      "name": "Handle returning callers",
+      "type": "free_form",
+      "trigger": "",
+      "has_draft": false,
+      "referenced_tool_ids": [],
+      "referenced_kb_ids": [],
+      "referenced_procedure_ids": [],
+      "referenced_dynamic_variables": [
+        "call_answering_status",
+        "call_reentry_notice_pending"
+      ]
+    },
+    {
+      "procedure_id": "agtprc_1701m2bnzk39eckvm3g8zbq6zvmb",
+      "version_id": "agtprcv_7301m2s0s6caezz943hs8av7xg1b",
+      "name": "Message Intake and Context Gathering",
+      "type": "free_form",
+      "trigger": "Caller wants to leave a message, get in touch with Chris, ask him to call back, or pass along information.",
+      "has_draft": false,
+      "referenced_tool_ids": [],
+      "referenced_kb_ids": [],
+      "referenced_procedure_ids": [],
+      "referenced_dynamic_variables": [
+        "call_answering_status",
+        "call_reentry_notice_pending"
+      ]
+    },
+    {
+      "procedure_id": "agtprc_7901m2bnzr80ebpbedsn62haqgvw",
+      "version_id": "agtprcv_9201m2s0s6cdf74r71m1yg2e234x",
+      "name": "Call Filtering and Screening",
+      "type": "free_form",
+      "trigger": "Caller is pitching products, unsolicited services, recruiting, selling, or cold outreach.",
+      "has_draft": false,
+      "referenced_tool_ids": [],
+      "referenced_kb_ids": [],
+      "referenced_procedure_ids": [],
+      "referenced_dynamic_variables": [
+        "call_answering_status",
+        "call_reentry_notice_pending"
+      ]
+    },
+    {
+      "procedure_id": "agtprc_2601m2bpx8stevjr5yc9qmpqdfgy",
+      "version_id": "agtprcv_1001m2s0s6cgfacshgwatqw0f7zn",
+      "name": "Emergency or Urgent Personal Matters",
+      "type": "free_form",
+      "trigger": "Caller indicates an urgent emergency, family emergency, medical crisis, or time-critical personal matter requiring immediate attention.",
+      "has_draft": false,
+      "referenced_tool_ids": [],
+      "referenced_kb_ids": [],
+      "referenced_procedure_ids": [],
+      "referenced_dynamic_variables": [
+        "call_answering_status",
+        "call_reentry_notice_pending"
+      ]
+    },
+    {
+      "procedure_id": "agtprc_7001m2qgkzkffaprryndkwvmkgd9",
+      "version_id": "agtprcv_0401m2snqhz9ejx9jfrs7tc5hrhh",
+      "name": "Telegram Master Control & Asynchronous Operations",
+      "type": "free_form",
+      "trigger": "",
+      "has_draft": false,
+      "referenced_tool_ids": [],
+      "referenced_kb_ids": [],
+      "referenced_procedure_ids": [],
+      "referenced_dynamic_variables": []
+    }
+  ]
+}
+
