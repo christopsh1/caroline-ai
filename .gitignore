@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+node_modules/
+.DS_Store
+*.log
+*** Add File: caroline-ai/docs/BASELINE.md
+# Baseline import
+
+The initial baseline was captured read-only from the live services on 2026-09-18 UTC.
+
+| Service | Live target | Captured |
+| --- | --- | --- |
+| ElevenLabs | Caroline / Main | Agent config, 11 branches, 47 tools, 5 knowledge documents, 9 procedures, 145 tests |
+| Supabase | Caroline / `drsyygxqwxuyoyjbsaqs` | Database catalog, migration history, extensions, generated types, 28 Edge Functions |
+
+Production remains authoritative until a later, explicit cutover decision. This repository contains configuration and source artifacts, not a backup of runtime data.
