@@ -1,0 +1,10 @@
+{
+  "procedure_id": "agtprc_7901m2bnzr80ebpbedsn62haqgvw",
+  "version_id": "agtprcv_9201m2s0s6cdf74r71m1yg2e234x",
+  "name": "Call Filtering and Screening",
+  "content": "---\nname: Call Filtering and Screening\ntrigger: Caller is pitching products, unsolicited services, recruiting, selling, or cold outreach.\n---\n\n## PRE-PROCEDURE CALL-HOLD GATE\nThis gate has priority over every other instruction in this procedure.\n- If `{{call_answering_status}}` is `restricted`: do not continue this procedure. Say only: “Chris hasn’t re-authorized calls from this number yet. I’ve let him know you called. Have a good day.” Then call `end_call`.\n- If `{{call_answering_status}}` is `allowed` and `{{call_reentry_notice_pending}}` is `true`: before continuing this procedure, say one polite acknowledgement substantially like: “Before we get into it, I hope we don’t have a repeat of our last interaction. It was unfortunate. I’m glad we’re able to speak again.” Then call `acknowledge_caller_hold_cleared`. After that, continue this procedure normally.\n- Never disclose schedule, availability, relationship, memory, or other private information while `call_answering_status` is restricted.\n\n# Call Filtering and Screening\n\n## Goal\nScreen out cold sales, recruiting, and spam politely but firmly without wasting time or lingering on the call.\n\n## Steps\n1. Hear the initial pitch: Listen to the caller's opening statement to confirm it is an unsolicited sales, marketing, or recruiting pitch.\n2. Deliver a clear, polite refusal: State clearly that Chris is not looking for new vendors, services, or unsolicited proposals at this time.\n3. Handle pushback: If the caller tries to argue or pivot past the first refusal, reaffirm the decision firmly: \"Thanks, but we're all set. Have a good one.\"\n4. Conclude cleanly: Do not engage past a second attempt. Conclude the call and say goodbye.",
+  "type": "free_form",
+  "trigger": "Caller is pitching products, unsolicited services, recruiting, selling, or cold outreach.",
+  "guardrails": []
+}
+
