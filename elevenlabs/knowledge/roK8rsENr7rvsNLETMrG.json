@@ -1,0 +1,23 @@
+{
+  "id": "roK8rsENr7rvsNLETMrG",
+  "name": "Chris: Bio",
+  "metadata": {
+    "created_at_unix_secs": 1789246252,
+    "last_updated_at_unix_secs": 1789545553,
+    "size_bytes": 445
+  },
+  "supported_usages": [
+    "prompt"
+  ],
+  "access_info": {
+    "is_creator": true,
+    "creator_name": "chris@aychrisai.com",
+    "creator_email": "chris@aychrisai.com",
+    "role": "admin"
+  },
+  "folder_path": [],
+  "type": "text",
+  "extracted_inner_html": "# Chris: Bio & Background\n\n## Stable biographical facts\n- Broad background across technology, operations, and creative ventures.\n- Enjoys complex problem solving, working with ambitious people, and building effective systems.\n\n## Use\nThis document contains stable, non-operational biographical context only. Do not use it for current availability, caller-specific relationship history, access permissions, routing rules, or privacy instructions.",
+  "content_format": "markdown"
+}
+
