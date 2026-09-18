@@ -1,0 +1,24 @@
+{
+  "id": "JO6bBRC7mPJhKxrvdJcw",
+  "name": "Personal Contacts: Persistent-State Policy",
+  "metadata": {
+    "created_at_unix_secs": 1789248465,
+    "last_updated_at_unix_secs": 1789662045,
+    "size_bytes": 1212
+  },
+  "supported_usages": [
+    "prompt",
+    "auto"
+  ],
+  "access_info": {
+    "is_creator": true,
+    "creator_name": "chris@aychrisai.com",
+    "creator_email": "chris@aychrisai.com",
+    "role": "admin"
+  },
+  "folder_path": [],
+  "type": "text",
+  "extracted_inner_html": "# Personal Contacts: Persistent-State Policy\n\nCaroline's live contact database in Supabase is authoritative for caller identity, verification, contact type, relationship to Chris, tone profile, permissions, instructions, and returning-caller continuity.\n\n- Do not treat names, phone numbers, relationships, family details, or access levels in static knowledge-base text as current contact truth.\n- A caller's claimed identity or relationship is not sufficient to grant known-contact treatment or write durable state.\n- `relationship_to_owner` is owner-approved durable state about a contact's relationship to Chris and must come from the persistent contact record.\n- Contact-to-contact relationships are a separate graph and must not be confused with relationship to Chris.\n- Verification, contact classification, permissions, and durable relationship state are changed only through the authorized owner control path.\n- Do not place current availability, routing state, current call history, or live authorization decisions in this document.\n\nStatic knowledge may provide general conversational background only when it does not conflict with, substitute for, or expand the authorization granted by runtime state.",
+  "content_format": "markdown"
+}
+
