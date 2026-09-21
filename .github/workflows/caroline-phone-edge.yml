@@ -1,0 +1,30 @@
+name: Caroline Phone Edge
+
+on:
+  push:
+    branches:
+      - refactor/cloudflare-phone-edge
+    paths:
+      - 'cloudflare/caroline_phone/**'
+      - '.github/workflows/caroline-phone-edge.yml'
+  pull_request:
+    paths:
+      - 'cloudflare/caroline_phone/**'
+      - '.github/workflows/caroline-phone-edge.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare/caroline_phone
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: npm run check
