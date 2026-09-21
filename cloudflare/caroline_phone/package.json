@@ -1,12 +1,17 @@
 {
   "name": "caroline-phone-edge",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "dev": "wrangler dev --env dev",
+    "deploy:dev": "wrangler deploy --env dev",
+    "deploy:prod": "wrangler deploy --env production",
     "typecheck": "tsc --noEmit",
-    "secrets:list": "wrangler secret list"
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "check": "npm run typecheck && npm test",
+    "secrets:list:dev": "wrangler secret list --env dev",
+    "secrets:list:prod": "wrangler secret list --env production"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260919.0",

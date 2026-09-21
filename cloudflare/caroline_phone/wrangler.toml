@@ -6,20 +6,35 @@ compatibility_flags = ["nodejs_compat"]
 [observability]
 enabled = true
 
-# Bind the live Cloudflare KV namespace named `Caroline_Phone` after its
-# namespace ID is read from the Cloudflare API. Do not guess or reuse an old ID.
+# The same namespace may be bound in development and production because all
+# Worker-owned keys are environment-prefixed. The live namespace ID is inserted
+# only after it is read from the Cloudflare API bridge.
 #
 # [[kv_namespaces]]
 # binding = "CAROLINE_PHONE"
 # id = "<LIVE_CAROLINE_PHONE_KV_NAMESPACE_ID>"
 
-# Worker secrets (never commit values):
+[env.dev]
+name = "caroline_phone-dev"
+
+[env.dev.vars]
+ENVIRONMENT = "development"
+TWILIO_INGRESS_ENABLED = "false"
+
+[env.production]
+name = "caroline_phone"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+TWILIO_INGRESS_ENABLED = "false"
+
+# Secrets are environment-specific and must never be committed:
 #   CAROLINE_RUNTIME_KEY
 #   ELEVENLABS_WEBHOOK_SECRET
-#
-# Optional downstream delivery, enabled only after a new backend contract is chosen:
 #   EVENT_SINK_URL
 #   EVENT_SINK_KEY
 #
-# Twilio ingress is intentionally disabled in v3 until its Cloudflare route is
-# explicitly configured and validated with Twilio's official request validator.
+# Reserved for the Twilio gate. Do not configure/enable until the exact public
+# callback URL is fixed and Twilio's supported request validator is wired:
+#   TWILIO_AUTH_TOKEN
+#   TWILIO_PUBLIC_BASE_URL

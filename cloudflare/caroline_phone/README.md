@@ -1,42 +1,64 @@
 # Caroline Phone Edge (Cloudflare)
 
-Cloudflare Worker for Caroline's phone edge. This package is intentionally independent of any database vendor.
+Cloudflare Worker for Caroline's phone edge. This package is deliberately independent of the database/backend vendor.
 
-## Current scope
+## What it is
 
-- Public health endpoint.
-- Authenticated status endpoint.
-- ElevenLabs webhook ingress with HMAC-SHA256 verification and timestamp validation.
-- Optional short-lived receipt metadata in the Cloudflare KV namespace `Caroline_Phone` after successful downstream delivery.
-- Fail-closed Twilio route until the exact Cloudflare callback URL and official Twilio request validation are configured.
-- No generic arbitrary webhook route.
-- No generic database/service-role proxy.
-- No notification system competing with Caroline's owner control plane.
-- No Supabase or Neon dependency.
+A narrow security and transport boundary for provider traffic. It authenticates provider requests, normalizes them into a Caroline-owned event contract, signs the edge-to-backend hop, and records non-sensitive delivery receipts.
 
-## Routes
+## Current routes
 
 - `GET /health`
 - `GET /status` — requires `x-caroline-key`
-- `POST /webhook/elevenlabs`
-- `/webhook/twilio*` — intentionally returns 503 until enabled safely
+- `POST /webhook/elevenlabs` — verified HMAC ingress
+- `/webhook/twilio*` — deliberately fail-closed until the Twilio validation gate is completed
+
+## Security posture
+
+- raw provider body is verified before JSON parsing;
+- ElevenLabs requests are capped at 256 KiB;
+- no raw webhook body or transcript logging;
+- no generic proxy or arbitrary webhook route;
+- no database service-role credential;
+- downstream event delivery requires HTTPS and a Caroline-owned HMAC;
+- KV stores receipt metadata only;
+- KV is not treated as a strict idempotency primitive.
 
 ## Required secrets
 
 - `CAROLINE_RUNTIME_KEY`
 - `ELEVENLABS_WEBHOOK_SECRET`
 
-## Optional downstream delivery secrets/config
+Before downstream delivery is enabled:
 
 - `EVENT_SINK_URL`
 - `EVENT_SINK_KEY`
 
-`EVENT_SINK_URL` is deliberately unset until the replacement backend contract is chosen. The Worker does not acknowledge a verified ElevenLabs event as successful when there is no configured sink.
+Reserved for the later Twilio gate:
 
-## KV
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_PUBLIC_BASE_URL`
 
-Bind the live namespace named `Caroline_Phone` to the Worker using the binding name `CAROLINE_PHONE`. Do not guess the namespace ID. The Worker stores only receipt metadata and a SHA-256 body hash for deduplication; it does not place raw transcripts or webhook headers into KV.
+## Cloudflare KV
 
-## Deploy gate
+Bind the live namespace named `Caroline_Phone` as `CAROLINE_PHONE` after reading its namespace ID through the authenticated Cloudflare API bridge. Do not guess the ID.
 
-Do not wire production Twilio or ElevenLabs endpoints to this Worker until the development deployment is verified and the downstream event sink is configured.
+KV keys are environment-prefixed and retain only successful-delivery receipt metadata for seven days.
+
+## Development
+
+```bash
+npm install
+npm run check
+npm run dev
+```
+
+Development deploy:
+
+```bash
+npm run deploy:dev
+```
+
+Production deployment remains gated by `DEPLOY.md`.
+
+See `ARCHITECTURE.md` for contracts and invariants.

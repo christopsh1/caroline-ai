@@ -1,51 +1,125 @@
-import type { Env } from '../index'
+import type { CarolineEventEnvelope, Env } from '../types'
+import { deliverEvent } from '../lib/delivery'
+import { deterministicEventId } from '../lib/event'
 import { json } from '../lib/http'
+import { log } from '../lib/log'
+import { RequestBodyTooLargeError, readBodyWithLimit } from '../lib/request'
+import { likelyAlreadyDelivered, recordReceipt } from '../lib/receipts'
 import { sha256Hex, verifyElevenLabsSignature } from '../lib/security'
 
-type ElevenLabsEvent = { type?: unknown; event_timestamp?: unknown; data?: { conversation_id?: unknown; [key: string]: unknown }; [key: string]: unknown }
+const MAX_BODY_BYTES = 256 * 1024
 
-function safeEventId(event: ElevenLabsEvent, rawBodyHash: string): string {
-  const type = typeof event.type === 'string' ? event.type : 'unknown'
-  const ts = typeof event.event_timestamp === 'number' || typeof event.event_timestamp === 'string' ? String(event.event_timestamp) : 'unknown'
-  const conversationId = typeof event.data?.conversation_id === 'string' ? event.data.conversation_id : 'unknown'
-  return `${type}:${conversationId}:${ts}:${rawBodyHash.slice(0, 16)}`
+type ElevenLabsEvent = {
+  type?: unknown
+  event_timestamp?: unknown
+  data?: {
+    conversation_id?: unknown
+    [key: string]: unknown
+  }
+  [key: string]: unknown
 }
 
-async function recordReceipt(env: Env, eventId: string, event: ElevenLabsEvent, bodyHash: string): Promise<void> {
-  if (!env.CAROLINE_PHONE) return
-  const metadata = { source: 'elevenlabs', event_id: eventId, event_type: typeof event.type === 'string' ? event.type : null, event_timestamp: event.event_timestamp ?? null, conversation_id: typeof event.data?.conversation_id === 'string' ? event.data.conversation_id : null, body_sha256: bodyHash, received_at: new Date().toISOString() }
-  await env.CAROLINE_PHONE.put(`receipt:elevenlabs:${eventId}`, JSON.stringify(metadata), { expirationTtl: 60 * 60 * 24 * 7 })
-}
+export async function handleElevenLabsWebhook(req: Request, env: Env, requestId: string): Promise<Response> {
+  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, requestId)
 
-async function alreadyReceived(env: Env, eventId: string): Promise<boolean> {
-  if (!env.CAROLINE_PHONE) return false
-  return (await env.CAROLINE_PHONE.get(`receipt:elevenlabs:${eventId}`)) !== null
-}
+  const contentType = req.headers.get('content-type')?.toLowerCase() ?? ''
+  if (!contentType.includes('application/json')) {
+    return json({ error: 'unsupported_media_type' }, 415, requestId)
+  }
 
-async function forwardEvent(req: Request, env: Env, rawBody: string, eventId: string): Promise<Response> {
-  if (!env.EVENT_SINK_URL) return json({ error: 'event_sink_not_configured', event_id: eventId }, 503)
-  const headers = new Headers({ 'Content-Type': req.headers.get('Content-Type') ?? 'application/json', 'X-Caroline-Source': 'elevenlabs', 'X-Caroline-Event-Id': eventId })
+  let rawBody: string
+  try {
+    ;({ rawBody } = await readBodyWithLimit(req, MAX_BODY_BYTES))
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      log('warn', 'elevenlabs_body_rejected', { request_id: requestId, reason: error.message })
+      return json({ error: 'payload_too_large' }, 413, requestId)
+    }
+    throw error
+  }
+
   const signature = req.headers.get('ElevenLabs-Signature')
-  if (signature) headers.set('ElevenLabs-Signature', signature)
-  if (env.EVENT_SINK_KEY) headers.set('x-caroline-key', env.EVENT_SINK_KEY)
-  let upstream: Response
-  try { upstream = await fetch(env.EVENT_SINK_URL, { method: 'POST', headers, body: rawBody }) } catch { return json({ error: 'event_sink_unreachable', event_id: eventId }, 502) }
-  if (!upstream.ok) return json({ error: 'event_sink_rejected', event_id: eventId, upstream_status: upstream.status }, 502)
-  return json({ ok: true, event_id: eventId })
-}
+  const verification = await verifyElevenLabsSignature(rawBody, signature, env.ELEVENLABS_WEBHOOK_SECRET)
+  if (!verification.ok) {
+    log('warn', 'elevenlabs_signature_rejected', { request_id: requestId, reason: verification.reason })
+    return json(
+      { error: verification.reason },
+      verification.reason === 'webhook_secret_not_configured' ? 503 : 401,
+      requestId,
+    )
+  }
 
-export async function handleElevenLabsWebhook(req: Request, env: Env): Promise<Response> {
-  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
-  const rawBody = await req.text()
-  const verification = await verifyElevenLabsSignature(rawBody, req.headers.get('ElevenLabs-Signature'), env.ELEVENLABS_WEBHOOK_SECRET)
-  if (!verification.ok) return json({ error: verification.reason }, verification.reason === 'webhook_secret_not_configured' ? 503 : 401)
   let event: ElevenLabsEvent
-  try { event = JSON.parse(rawBody) as ElevenLabsEvent } catch { return json({ error: 'invalid_json' }, 400) }
-  if (typeof event.type !== 'string' || !event.type) return json({ error: 'event_type_required' }, 400)
-  const bodyHash = await sha256Hex(rawBody)
-  const eventId = safeEventId(event, bodyHash)
-  if (await alreadyReceived(env, eventId)) return json({ ok: true, duplicate: true, event_id: eventId })
-  const delivered = await forwardEvent(req, env, rawBody, eventId)
-  if (delivered.ok) await recordReceipt(env, eventId, event, bodyHash)
-  return delivered
+  try {
+    event = JSON.parse(rawBody) as ElevenLabsEvent
+  } catch {
+    return json({ error: 'invalid_json' }, 400, requestId)
+  }
+
+  if (typeof event.type !== 'string' || !event.type) {
+    return json({ error: 'event_type_required' }, 400, requestId)
+  }
+
+  const payloadHash = await sha256Hex(rawBody)
+  const eventId = deterministicEventId(event, payloadHash)
+
+  if (await likelyAlreadyDelivered(env, eventId)) {
+    log('info', 'elevenlabs_replay_short_circuit', { request_id: requestId, event_id: eventId })
+    return json({ ok: true, duplicate_likely: true, event_id: eventId }, 200, requestId)
+  }
+
+  const envelope: CarolineEventEnvelope<ElevenLabsEvent> = {
+    schema_version: '1',
+    event_id: eventId,
+    request_id: requestId,
+    environment: env.ENVIRONMENT ?? 'unknown',
+    source: 'elevenlabs',
+    source_event_type: event.type,
+    source_event_timestamp:
+      typeof event.event_timestamp === 'number' || typeof event.event_timestamp === 'string'
+        ? event.event_timestamp
+        : null,
+    received_at: new Date().toISOString(),
+    payload_sha256: payloadHash,
+    payload: event,
+  }
+
+  const delivery = await deliverEvent(env, envelope)
+  if (!delivery.ok) {
+    log('warn', 'elevenlabs_delivery_failed', {
+      request_id: requestId,
+      event_id: eventId,
+      reason: delivery.reason,
+      upstream_status: delivery.status ?? null,
+    })
+    return json(
+      {
+        error: delivery.reason,
+        event_id: eventId,
+        ...(delivery.status ? { upstream_status: delivery.status } : {}),
+      },
+      delivery.reason === 'sink_rejected' || delivery.reason === 'sink_unreachable' ? 502 : 503,
+      requestId,
+    )
+  }
+
+  await recordReceipt(env, {
+    source: 'elevenlabs',
+    event_id: eventId,
+    event_type: event.type,
+    event_timestamp: envelope.source_event_timestamp,
+    payload_sha256: payloadHash,
+    request_id: requestId,
+    delivered_at: new Date().toISOString(),
+    environment: envelope.environment,
+  })
+
+  log('info', 'elevenlabs_event_delivered', {
+    request_id: requestId,
+    event_id: eventId,
+    event_type: event.type,
+    sink_status: delivery.status,
+  })
+
+  return json({ ok: true, event_id: eventId }, 200, requestId)
 }

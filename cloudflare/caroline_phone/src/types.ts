@@ -1,0 +1,26 @@
+export interface Env {
+  ENVIRONMENT?: string
+  CAROLINE_RUNTIME_KEY?: string
+  ELEVENLABS_WEBHOOK_SECRET?: string
+  EVENT_SINK_URL?: string
+  EVENT_SINK_KEY?: string
+  TWILIO_INGRESS_ENABLED?: string
+  TWILIO_AUTH_TOKEN?: string
+  TWILIO_PUBLIC_BASE_URL?: string
+  CAROLINE_PHONE?: KVNamespace
+}
+
+export type EventSource = 'elevenlabs'
+
+export interface CarolineEventEnvelope<T = unknown> {
+  schema_version: '1'
+  event_id: string
+  request_id: string
+  environment: string
+  source: EventSource
+  source_event_type: string
+  source_event_timestamp: string | number | null
+  received_at: string
+  payload_sha256: string
+  payload: T
+}
