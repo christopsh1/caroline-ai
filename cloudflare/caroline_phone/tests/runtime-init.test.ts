@@ -24,7 +24,7 @@ test('init contract defaults missing context to fail-closed privacy values', () 
   assert.equal(roleFromVariables(vars), 'unknown')
 })
 
-test('owner receives only owner + admitted hold tools by default', () => {
+test('owner receives only owner tools by default and cannot self-hold', () => {
   const response = buildElevenLabsInitResponse({
     schema_version: '1',
     dynamic_variables: {
@@ -43,7 +43,7 @@ test('owner receives only owner + admitted hold tools by default', () => {
   assert.equal(vars.bio_short, 'safe bio')
   assert.equal('database_password' in vars, false)
   const agent = (response!.conversation_config_override as any).agent
-  assert.deepEqual(agent.prompt.tool_ids, ['owner-retrieve', 'owner-sms', 'owner-resolve', 'caller-hold'])
+  assert.deepEqual(agent.prompt.tool_ids, ['owner-retrieve', 'owner-sms', 'owner-resolve'])
   assert.equal(agent.first_message, 'Welcome back.')
   assert.equal('llm' in agent.prompt, false)
 })
