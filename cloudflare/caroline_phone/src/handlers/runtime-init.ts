@@ -16,7 +16,7 @@ function validInitInput(value: unknown): value is Record<string, unknown> {
 
 export async function handleRuntimeInit(req: Request, env: Env, requestId: string): Promise<Response> {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, requestId)
-  if (!verifyRuntimeKey(req, env.CAROLINE_RUNTIME_KEY)) return json({ error: 'unauthorized' }, 401, requestId)
+  if (!verifyRuntimeKey(req, env.CAROLINE_KEY)) return json({ error: 'forbidden' }, 403, requestId)
   if (!(req.headers.get('content-type')?.toLowerCase() ?? '').includes('application/json')) {
     return json({ error: 'unsupported_media_type' }, 415, requestId)
   }
