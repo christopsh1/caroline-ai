@@ -12,7 +12,7 @@ export function handleStatus(env: Env, requestId: string): Response {
   return json({
     ok: true,
     service: 'caroline_phone',
-    release: '3.7.0',
+    release: '3.8.0',
     role: 'cloudflare_edge_runtime_facade',
     environment: env.ENVIRONMENT ?? 'unknown',
     ready: {
@@ -39,7 +39,7 @@ export function handleStatus(env: Env, requestId: string): Response {
       runtime_init: 'authenticated_whitelist_facade',
       runtime_retrieve: 'authenticated_sanitizing_facade',
       elevenlabs_events: 'verified_ingress_async_delivery',
-      twilio: env.TWILIO_INGRESS_ENABLED === 'true' ? 'blocked_until_validator_is_wired' : 'disabled_fail_closed',
+      twilio: env.TWILIO_INGRESS_ENABLED === 'true' ? 'signature_validation_ready_routing_disabled' : 'disabled_fail_closed',
       generic_webhook: 'not_exposed',
       generic_proxy: 'not_exposed',
     },
