@@ -12,7 +12,7 @@ export function handleStatus(env: Env, requestId: string): Response {
   return json({
     ok: true,
     service: 'caroline_phone',
-    release: '3.4.0',
+    release: '3.6.0',
     role: 'cloudflare_edge_runtime_facade',
     environment: env.ENVIRONMENT ?? 'unknown',
     ready: {
