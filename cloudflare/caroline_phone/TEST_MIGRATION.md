@@ -33,3 +33,7 @@ The old restricted-caller simulation starts with the normal agent greeting and r
 ## Cutover rule
 
 No legacy test is allowed to force a weaker identity, privacy, or authorization design. Production cutover requires the current Cloudflare contract suite plus a curated vendor-neutral ElevenLabs regression set to pass against the development deployment.
+
+## Replacement personal-register fixture
+
+The clean ElevenLabs test `CLOUDFLARE REFACTOR — Verified personal register` (`test_3401m350e50gfz1tb2qgp67j85m1`) passes on the non-live `cloudflare-refactor` branch. It supplies authoritative verified-personal runtime context and does not pre-start unrelated procedures. Use it in the curated refactor suite instead of the stale personal-register fixture.
