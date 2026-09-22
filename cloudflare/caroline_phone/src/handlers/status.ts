@@ -1,58 +1,56 @@
 import type { Env } from '../types.ts'
 import { json } from '../lib/http.ts'
-import { sinkReady } from '../lib/delivery.ts'
 import { asyncPipelineReady } from '../lib/staging.ts'
-
-function coreRuntimeReady(env: Env): boolean {
-  if (!env.CORE_RUNTIME_URL || !env.CORE_RUNTIME_KEY) return false
-  try { return new URL(env.CORE_RUNTIME_URL).protocol === 'https:' } catch { return false }
-}
+import { PENDING_NEON_INTEGRATION } from '../lib/canonical.ts'
 
 export function handleStatus(env: Env, requestId: string): Response {
+  const sessionStoreReady = Boolean(env.CAROLINE_SESSIONS)
+  const requestAuthReady = Boolean(env.CAROLINE_KEY)
+  const asyncCaptureReady = Boolean(env.ELEVENLABS_WEBHOOK_SECRET) && asyncPipelineReady(env)
+
   return json({
     ok: true,
     service: 'caroline_phone',
-    release: '3.9.0',
-    role: 'cloudflare_edge_runtime_facade',
+    release: '3.10.0',
+    role: 'cloudflare_phone_runtime_boundary',
     environment: env.ENVIRONMENT ?? 'unknown',
     ready: {
-      runtime_facade: Boolean(env.CAROLINE_KEY) && coreRuntimeReady(env),
-      async_pipeline: asyncPipelineReady(env),
-      event_sink: sinkReady(env),
-      elevenlabs_event_ingress: Boolean(env.ELEVENLABS_WEBHOOK_SECRET) && asyncPipelineReady(env) && sinkReady(env),
+      request_auth: requestAuthReady,
+      durable_session_store: sessionStoreReady,
+      call_init_orchestration: requestAuthReady && sessionStoreReady,
+      elevenlabs_event_capture: asyncCaptureReady,
       twilio_signature_validation: Boolean(env.TWILIO_AUTH_TOKEN),
+      canonical_backend: false,
     },
     configured: {
-      runtime_key: Boolean(env.CAROLINE_KEY),
-      core_runtime: Boolean(env.CORE_RUNTIME_URL),
-      core_runtime_auth: Boolean(env.CORE_RUNTIME_KEY),
+      runtime_key: requestAuthReady,
+      durable_sessions: sessionStoreReady,
       phone_tool_policy: Boolean(env.PHONE_TOOL_POLICY_JSON),
       elevenlabs_webhook_secret: Boolean(env.ELEVENLABS_WEBHOOK_SECRET),
       caroline_phone_kv: Boolean(env.Caroline_Phone),
       payload_r2: Boolean(env.CAROLINE_PAYLOADS),
       events_queue: Boolean(env.CAROLINE_EVENTS),
-      event_sink: Boolean(env.EVENT_SINK_URL),
-      event_sink_auth: Boolean(env.EVENT_SINK_KEY),
       twilio_auth_token: Boolean(env.TWILIO_AUTH_TOKEN),
     },
-    routes: {
-      runtime_init: 'authenticated_whitelist_facade',
-      runtime_retrieve: 'authenticated_sanitizing_facade',
-      elevenlabs_events: 'verified_ingress_async_delivery',
-      twilio: 'signature_validation_active_routing_disabled',
-      generic_webhook: 'not_exposed',
-      generic_proxy: 'not_exposed',
+    pending_integrations: {
+      neon_canonical_data: PENDING_NEON_INTEGRATION,
+      canonical_event_delivery: PENDING_NEON_INTEGRATION,
+    },
+    storage_roles: {
+      worker_code: 'request_validation_orchestration_policy_safe_fallback',
+      durable_object_storage: 'authoritative_active_session_truth',
+      kv: 'noncritical_cache_config_telemetry_only',
+      r2: 'verified_event_payload_staging',
+      queue: 'event_pointer_retry_transport',
+      neon: 'pending_canonical_identity_permissions_rag_actions_and_cross_session_state',
     },
     guarantees: {
-      provider_event_authentication: 'hmac',
-      core_request_authentication: 'caroline_hmac',
-      core_response_authentication: 'caroline_hmac',
-      init_override_surface: 'dynamic_variables_tool_ids_first_message_only',
-      queue_payload: 'pointer_only',
-      payload_store: 'r2_strong_consistency',
-      kv_role: 'receipt_and_security_counter_metadata_only_not_strict_idempotency',
+      active_call_truth_in_kv: false,
+      permission_truth_in_kv: false,
+      mutable_global_session_state: false,
       raw_payload_logging: false,
       raw_header_logging: false,
+      unverified_call_tool_surface: 'empty',
     },
   }, 200, requestId)
 }
