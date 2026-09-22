@@ -1,0 +1,70 @@
+name: Provision Caroline Cloudflare Queues
+
+on:
+  push:
+    branches:
+      - refactor/cloudflare-phone-edge
+    paths:
+      - .github/workflows/provision-caroline-queues.yml
+  workflow_dispatch:
+
+jobs:
+  provision:
+    name: Ensure Cloudflare queues exist
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+    steps:
+      - name: Validate required GitHub secrets are available
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+      - name: Ensure production queues exist
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          api="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/queues"
+          auth="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
+
+          ensure_queue() {
+            name="$1"
+            list="$(curl --fail-with-body --silent --show-error \
+              -H "$auth" \
+              -H 'Content-Type: application/json' \
+              "$api")"
+
+            if printf '%s' "$list" | jq -e --arg name "$name" '.result[]? | select(.queue_name == $name)' >/dev/null; then
+              echo "Queue already exists: $name"
+              return 0
+            fi
+
+            echo "Creating queue: $name"
+            curl --fail-with-body --silent --show-error \
+              -X POST \
+              -H "$auth" \
+              -H 'Content-Type: application/json' \
+              --data "$(jq -nc --arg name "$name" '{queue_name:$name}')" \
+              "$api" | jq -e '.success == true' >/dev/null
+          }
+
+          ensure_queue caroline-event-delivery
+          ensure_queue caroline-event-dlq
+
+      - name: Verify queues exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/queues")"
+
+          printf '%s' "$response" | jq -e '.result[]? | select(.queue_name == "caroline-event-delivery")' >/dev/null
+          printf '%s' "$response" | jq -e '.result[]? | select(.queue_name == "caroline-event-dlq")' >/dev/null
+          echo "Verified both Caroline queues exist in Cloudflare."
