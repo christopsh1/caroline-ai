@@ -67,3 +67,10 @@ TWILIO_INGRESS_ENABLED = "false"
 # Reserved for Twilio gate:
 #   TWILIO_AUTH_TOKEN
 #   TWILIO_PUBLIC_BASE_URL
+
+# Runtime-facade configuration is environment-specific and intentionally absent
+# until a replacement core is selected/deployed:
+#   CORE_RUNTIME_URL       (HTTPS base origin; edge calls /v1/init and /v1/retrieve)
+#   PHONE_TOOL_POLICY_JSON (owner/external/unknown tool-id arrays)
+# Secret:
+#   CORE_RUNTIME_KEY

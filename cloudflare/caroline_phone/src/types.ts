@@ -4,6 +4,9 @@ export interface Env {
   ELEVENLABS_WEBHOOK_SECRET?: string
   EVENT_SINK_URL?: string
   EVENT_SINK_KEY?: string
+  CORE_RUNTIME_URL?: string
+  CORE_RUNTIME_KEY?: string
+  PHONE_TOOL_POLICY_JSON?: string
   TWILIO_INGRESS_ENABLED?: string
   TWILIO_AUTH_TOKEN?: string
   TWILIO_PUBLIC_BASE_URL?: string

@@ -1,15 +1,16 @@
-# Deployment sequence — v3.2
+# Deployment sequence — v3.3
 
 1. Read live Cloudflare Workers, KV, R2, Queues and routes through the authenticated API bridge.
 2. Confirm no production `caroline-phone` Worker will be overwritten.
 3. Read the live `Caroline_Phone` KV namespace ID.
-4. Create/confirm `caroline-phone-payloads` R2, `caroline-phone-events` Queue, and `caroline-phone-events-dlq`.
+4. Create/confirm dev R2, Queue and DLQ resources.
 5. Bind KV/R2/Queue resources in the development environment first.
-6. Configure development secrets without committing values.
-7. Configure and verify the replacement event sink; it must enforce Caroline HMAC and idempotency by `event_id`.
-8. Run `npm run check`; deploy `caroline_phone-dev`.
-9. Verify `/health`, authenticated `/status`, signed synthetic ElevenLabs ingress, R2 staging, Queue consumption, retries, DLQ path, and cleanup.
-10. Point only the non-live ElevenLabs `cloudflare-refactor` branch at the development Worker and run regression tests.
-11. Implement Twilio request validation against the exact Cloudflare callback URL before enabling any Twilio edge route.
-12. Change production provider endpoints only after regression success, one route at a time, with rollback values documented.
-13. Rotate the Cloudflare setup API token if it was passed as an action parameter.
+6. Configure development secrets/config without committing values: runtime key, ElevenLabs webhook secret, core URL/key, tool policy, event-sink URL/key.
+7. Deploy or connect a development core runtime that implements signed `/v1/init` and `/v1/retrieve` responses and downstream idempotency.
+8. Run `npm run check`; current local baseline is 22/22 tests passing.
+9. Deploy `caroline-phone-dev`.
+10. Verify `/health`, authenticated `/status`, `/runtime/init`, `/runtime/retrieve`, signed synthetic ElevenLabs event ingress, R2 staging, Queue consumption, retries, DLQ path, and cleanup.
+11. Point only the non-live ElevenLabs `cloudflare-refactor` branch at the development Worker; configure its environment/tool headers and run regression tests.
+12. Implement Twilio request validation against the exact Cloudflare callback URL before enabling any Twilio edge route.
+13. Change production provider endpoints only after regression success, one route at a time, with rollback values documented.
+14. Rotate the Cloudflare setup API token if it was passed as an action parameter.

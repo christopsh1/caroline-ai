@@ -17,14 +17,12 @@ function parseElevenLabsSignature(header: string | null): { timestamp: string; s
   if (!header) return null
   let timestamp = ''
   const signatures: string[] = []
-
   for (const part of header.split(',')) {
     const [key, ...rest] = part.trim().split('=')
     const value = rest.join('=')
     if (key === 't') timestamp = value
     if (key === 'v0' && value) signatures.push(value.toLowerCase())
   }
-
   return timestamp && signatures.length ? { timestamp, signatures } : null
 }
 
@@ -43,11 +41,41 @@ export async function verifyElevenLabsSignature(
   if (!secret) return { ok: false, reason: 'webhook_secret_not_configured' }
   const parsed = parseElevenLabsSignature(header)
   if (!parsed) return { ok: false, reason: 'signature_missing_or_malformed' }
-
   const timestamp = Number(parsed.timestamp)
   if (!Number.isFinite(timestamp)) return { ok: false, reason: 'invalid_signature_timestamp' }
   if (Math.abs(nowSeconds - timestamp) > MAX_ELEVENLABS_SIGNATURE_AGE_SECONDS) return { ok: false, reason: 'stale_signature' }
+  const expected = await hmacSha256Hex(secret, `${parsed.timestamp}.${rawBody}`)
+  return parsed.signatures.some((sig) => timingSafeEqual(expected, sig))
+    ? { ok: true }
+    : { ok: false, reason: 'invalid_signature' }
+}
 
+function parseCarolineSignature(header: string | null): { timestamp: string; signatures: string[] } | null {
+  if (!header) return null
+  let timestamp = ''
+  const signatures: string[] = []
+  for (const part of header.split(',')) {
+    const [key, ...rest] = part.trim().split('=')
+    const value = rest.join('=')
+    if (key === 't') timestamp = value
+    if (key === 'v1' && value) signatures.push(value.toLowerCase())
+  }
+  return timestamp && signatures.length ? { timestamp, signatures } : null
+}
+
+export async function verifyCarolinePayloadSignature(
+  rawBody: string,
+  header: string | null,
+  secret: string | undefined,
+  nowSeconds = Math.floor(Date.now() / 1000),
+  maxAgeSeconds = 5 * 60,
+): Promise<{ ok: boolean; reason?: string }> {
+  if (!secret) return { ok: false, reason: 'signature_secret_not_configured' }
+  const parsed = parseCarolineSignature(header)
+  if (!parsed) return { ok: false, reason: 'signature_missing_or_malformed' }
+  const timestamp = Number(parsed.timestamp)
+  if (!Number.isFinite(timestamp)) return { ok: false, reason: 'invalid_signature_timestamp' }
+  if (Math.abs(nowSeconds - timestamp) > maxAgeSeconds) return { ok: false, reason: 'stale_signature' }
   const expected = await hmacSha256Hex(secret, `${parsed.timestamp}.${rawBody}`)
   return parsed.signatures.some((sig) => timingSafeEqual(expected, sig))
     ? { ok: true }

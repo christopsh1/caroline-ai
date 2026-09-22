@@ -32,3 +32,21 @@ test('creates a Caroline downstream HMAC header', async () => {
   const result = await signCarolinePayload('{"hello":"world"}', secret, 123)
   assert.match(result, /^t=123,v1=[a-f0-9]{64}$/)
 })
+
+test('verifies Caroline v1 signatures used between edge and core', async () => {
+  const { verifyCarolinePayloadSignature } = await import('../src/lib/security.ts')
+  const now = 1_800_000_000
+  const body = '{"ok":true}'
+  const header = await signCarolinePayload(body, secret, now)
+  assert.deepEqual(await verifyCarolinePayloadSignature(body, header, secret, now, 300), { ok: true })
+})
+
+test('rejects stale Caroline edge/core signatures', async () => {
+  const { verifyCarolinePayloadSignature } = await import('../src/lib/security.ts')
+  const now = 1_800_000_000
+  const body = '{"ok":true}'
+  const header = await signCarolinePayload(body, secret, now - 301)
+  const result = await verifyCarolinePayloadSignature(body, header, secret, now, 300)
+  assert.equal(result.ok, false)
+  assert.equal(result.reason, 'stale_signature')
+})
