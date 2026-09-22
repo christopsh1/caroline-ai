@@ -124,3 +124,36 @@ test('missing or malformed tool policy produces an empty dynamic tool surface in
   assert.ok(malformed)
   assert.deepEqual((malformed!.conversation_config_override as any).agent.prompt.tool_ids, [])
 })
+
+
+test('blocked calls use an edge-owned first message and ignore backend caller-facing copy', () => {
+  for (const status of ['restricted', 'restricted_by_owner', 'banned', 'waitlisted']) {
+    const response = buildElevenLabsInitResponse({
+      schema_version: '1',
+      dynamic_variables: {
+        caller_identity_status: 'verified_owner',
+        caller_access_tier: 'tier_owner',
+        call_answering_status: status,
+        call_answering_reason: 'sensitive internal reason that must never be spoken',
+      },
+      first_message: 'Backend says Chris was notified and here is the private restriction reason.',
+    }, envWithPolicy())
+
+    assert.ok(response)
+    const agent = (response!.conversation_config_override as any).agent
+    assert.deepEqual(agent.prompt.tool_ids, [], status)
+    assert.match(agent.first_message, /isn't authorized|hasn't been re-authorized/)
+    assert.doesNotMatch(agent.first_message, /notified|private restriction|sensitive internal/i)
+  }
+})
+
+test('allowed calls may use a sanitized backend first message', () => {
+  const response = buildElevenLabsInitResponse({
+    schema_version: '1',
+    dynamic_variables: { call_answering_status: 'allowed' },
+    first_message: 'Welcome back.',
+  }, envWithPolicy())
+
+  assert.ok(response)
+  assert.equal((response!.conversation_config_override as any).agent.first_message, 'Welcome back.')
+})
