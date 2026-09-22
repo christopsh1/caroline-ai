@@ -17,7 +17,7 @@ export default {
     const url = new URL(req.url)
     try {
       if (url.pathname === '/health' && req.method === 'GET') {
-        return json({ ok: true, service: 'caroline_phone', release: '3.3.0' }, 200, requestId)
+        return json({ ok: true, service: 'caroline_phone', release: '3.4.0' }, 200, requestId)
       }
       if (url.pathname === '/status' && req.method === 'GET') {
         if (!verifyRuntimeKey(req, env.CAROLINE_RUNTIME_KEY)) return json({ error: 'unauthorized' }, 401, requestId)

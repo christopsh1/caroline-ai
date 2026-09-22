@@ -1,4 +1,4 @@
-# Caroline Phone Edge Architecture — v3.3
+# Caroline Phone Edge Architecture — v3.4
 
 ## Role
 `caroline-phone` is Caroline's provider security, runtime-facade, and transport boundary. It is not the memory store, business database, owner UI, or conversational brain.
@@ -26,6 +26,12 @@ The core cannot inject a replacement prompt, LLM, arbitrary tool IDs, credential
 
 ### Retrieval trust boundary
 `/runtime/retrieve` validates bounded request fields and the allowed interaction modes (`inbound_owner`, `inbound_external`, `outbound`). The core remains responsible for identity/scope authorization. The edge returns only a small sanitized envelope: `authorized`, `context`, and bounded text results. Internal IDs/debug fields are discarded.
+
+
+## Phone tool capability policy
+The init facade selects tools from deployment-time capability buckets rather than trusting core-supplied IDs. Restricted/waitlisted/banned calls receive no custom tools. Admitted inbound calls receive only their verified role bucket plus narrowly conditional hold/calendar/re-entry capabilities. Outbound calls use a separate outbound bucket. Missing or malformed policy fails closed to an empty tool surface.
+
+Stable ElevenLabs workspace tools are required: transient IDs produced by the legacy init path are forbidden as deployment policy because historical calls proved those IDs can disappear and fail call startup.
 
 ## LLM path
 The non-live ElevenLabs refactor branch uses ElevenLabs-hosted GPT-5.6 Terra with a native fallback rather than the old custom-LLM proxy. Cloudflare is intentionally not in the token-stream path.

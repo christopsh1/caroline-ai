@@ -1,4 +1,4 @@
-# Caroline Phone Edge (Cloudflare) v3.3
+# Caroline Phone Edge (Cloudflare) v3.4
 
 Backend-neutral Cloudflare edge and runtime facade for Caroline.
 
@@ -35,3 +35,7 @@ The queue never contains the full transcript/event payload. Full envelopes are s
 - Queue producer binding `CAROLINE_EVENTS`
 
 Twilio remains gated behind `TWILIO_AUTH_TOKEN` and `TWILIO_PUBLIC_BASE_URL` plus a completed validator.
+
+
+## Phone tool policy
+The init facade uses composable least-privilege capability buckets. See `PHONE_TOOL_POLICY.md` and `config/phone-tool-policy.example.json`. Restricted/waitlisted/banned calls receive zero custom tools; calendar and re-entry tools are conditional.

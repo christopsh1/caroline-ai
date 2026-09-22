@@ -30,10 +30,19 @@ const SAFE_DEFAULTS = {
 export type CarolineDynamicVariableName = keyof typeof SAFE_DEFAULTS
 export type PhoneRole = 'owner' | 'external' | 'unknown'
 
+export interface InitRequestContext {
+  interaction_mode?: unknown
+  outbound_call?: unknown
+}
+
 interface ToolPolicy {
   owner: string[]
   external: string[]
   unknown: string[]
+  outbound: string[]
+  hold: string[]
+  calendar_read: string[]
+  reentry: string[]
 }
 
 export interface CoreInitResponse {
@@ -61,15 +70,25 @@ export function roleFromVariables(vars: Record<CarolineDynamicVariableName, stri
   return 'unknown'
 }
 
+function emptyToolPolicy(): ToolPolicy {
+  return { owner: [], external: [], unknown: [], outbound: [], hold: [], calendar_read: [], reentry: [] }
+}
+
+function parseToolList(value: unknown): string[] | null {
+  if (!Array.isArray(value) || !value.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 160)) return null
+  return [...new Set(value as string[])].slice(0, 64)
+}
+
 function parseToolPolicy(raw: string | undefined): ToolPolicy {
-  const empty: ToolPolicy = { owner: [], external: [], unknown: [] }
+  const empty = emptyToolPolicy()
   if (!raw) return empty
   try {
     const value = JSON.parse(raw) as Record<string, unknown>
-    for (const role of ['owner', 'external', 'unknown'] as const) {
-      const list = value[role]
-      if (!Array.isArray(list) || !list.every((x) => typeof x === 'string')) return empty
-      empty[role] = [...new Set(list as string[])].slice(0, 64)
+    if (!isPlainObject(value)) return empty
+    for (const bucket of ['owner', 'external', 'unknown', 'outbound', 'hold', 'calendar_read', 'reentry'] as const) {
+      const parsed = parseToolList(value[bucket])
+      if (parsed === null) return empty
+      empty[bucket] = parsed
     }
     return empty
   } catch {
@@ -84,13 +103,47 @@ function safeFirstMessage(value: unknown): string | undefined {
   return trimmed
 }
 
-export function buildElevenLabsInitResponse(coreBody: unknown, env: Env): Record<string, unknown> | null {
+function isOutbound(context: InitRequestContext | undefined): boolean {
+  if (!context) return false
+  return context.outbound_call === true || context.interaction_mode === 'outbound'
+}
+
+export function selectPhoneToolIds(
+  vars: Record<CarolineDynamicVariableName, string>,
+  policy: ToolPolicy,
+  context?: InitRequestContext,
+): string[] {
+  // Restricted/waitlisted/banned calls should never receive custom action tools.
+  if (vars.call_answering_status !== 'allowed') return []
+
+  if (isOutbound(context)) return [...new Set(policy.outbound)].slice(0, 64)
+
+  const role = roleFromVariables(vars)
+  const selected = [...policy[role]]
+
+  // The hold action is available only on an admitted live inbound conversation.
+  selected.push(...policy.hold)
+
+  // Calendar reads are possible only when runtime context explicitly grants a share level.
+  if (vars.calendar_share_level !== 'none') selected.push(...policy.calendar_read)
+
+  // Re-entry acknowledgement exists only for the one call carrying a pending notice.
+  if (vars.call_reentry_notice_pending === 'true') selected.push(...policy.reentry)
+
+  return [...new Set(selected)].slice(0, 64)
+}
+
+export function buildElevenLabsInitResponse(
+  coreBody: unknown,
+  env: Env,
+  context?: InitRequestContext,
+): Record<string, unknown> | null {
   if (!isPlainObject(coreBody)) return null
   if (coreBody.schema_version !== '1') return null
 
   const dynamicVariables = normalizeDynamicVariables(coreBody.dynamic_variables)
-  const role = roleFromVariables(dynamicVariables)
   const policy = parseToolPolicy(env.PHONE_TOOL_POLICY_JSON)
+  const toolIds = selectPhoneToolIds(dynamicVariables, policy, context)
   const firstMessage = safeFirstMessage(coreBody.first_message)
 
   const response: Record<string, unknown> = {
@@ -98,7 +151,7 @@ export function buildElevenLabsInitResponse(coreBody: unknown, env: Env): Record
     dynamic_variables: dynamicVariables,
     conversation_config_override: {
       agent: {
-        prompt: { tool_ids: policy[role] },
+        prompt: { tool_ids: toolIds },
         ...(firstMessage ? { first_message: firstMessage } : {}),
       },
     },

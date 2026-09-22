@@ -37,7 +37,7 @@ export async function handleRuntimeInit(req: Request, env: Env, requestId: strin
     return json({ error: core.reason }, core.reason === 'core_rejected' || core.reason === 'core_unreachable' ? 502 : 503, requestId)
   }
 
-  const response = buildElevenLabsInitResponse(core.body, env)
+  const response = buildElevenLabsInitResponse(core.body, env, input)
   if (!response) {
     log('error', 'runtime_init_core_response_invalid', { request_id: requestId })
     return json({ error: 'invalid_core_init_response' }, 502, requestId)
