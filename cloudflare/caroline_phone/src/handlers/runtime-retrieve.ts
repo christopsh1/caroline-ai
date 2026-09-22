@@ -66,7 +66,7 @@ function sanitizeCoreResult(value: unknown): Record<string, unknown> | null {
 
 export async function handleRuntimeRetrieve(req: Request, env: Env, requestId: string): Promise<Response> {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, requestId)
-  if (!verifyRuntimeKey(req, env.CAROLINE_RUNTIME_KEY)) return json({ error: 'unauthorized' }, 401, requestId)
+  if (!verifyRuntimeKey(req, env.CAROLINE_KEY)) return json({ error: 'forbidden' }, 403, requestId)
   if (!(req.headers.get('content-type')?.toLowerCase() ?? '').includes('application/json')) {
     return json({ error: 'unsupported_media_type' }, 415, requestId)
   }
@@ -85,7 +85,7 @@ export async function handleRuntimeRetrieve(req: Request, env: Env, requestId: s
   const core = await callCoreRuntime(env, 'retrieve', input, requestId, RETRIEVE_RESPONSE_MAX_BYTES)
   if (!core.ok) {
     log('warn', 'runtime_retrieve_core_failed', { request_id: requestId, reason: core.reason, upstream_status: core.status ?? null })
-    return json({ error: core.reason }, core.reason === 'core_rejected' || core.reason === 'core_unreachable' ? 502 : 503, requestId)
+    return json({ error: 'upstream_unavailable' }, core.reason === 'core_rejected' || core.reason === 'core_unreachable' ? 502 : 503, requestId)
   }
 
   const response = sanitizeCoreResult(core.body)
