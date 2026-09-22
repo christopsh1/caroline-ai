@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 
-test('wrangler config binds Durable Object, delivery queue, DLQ, and keeps secrets out of vars', () => {
+test('wrangler config binds Durable Object, production delivery queue/DLQ, isolated dev queues, and keeps secrets out of vars', () => {
   const text=readFileSync(new URL('../wrangler.toml', import.meta.url).pathname,'utf8')
   assert.match(text,/\[exports\.CarolineSession\][\s\S]*storage = "sqlite"/)
   assert.match(text,/\[\[env\.dev\.durable_objects\.bindings\]\][\s\S]*name = "CAROLINE_SESSIONS"/)
@@ -10,6 +10,8 @@ test('wrangler config binds Durable Object, delivery queue, DLQ, and keeps secre
   assert.match(text,/binding = "CAROLINE_EVENT_QUEUE"[\s\S]*queue = "caroline-event-delivery"/)
   assert.match(text,/binding = "CAROLINE_EVENT_DLQ"[\s\S]*queue = "caroline-event-dlq"/)
   assert.match(text,/queue = "caroline-event-delivery"[\s\S]*max_batch_size = 10[\s\S]*max_batch_timeout = 5[\s\S]*max_retries = 3[\s\S]*dead_letter_queue = "caroline-event-dlq"/)
-  assert.doesNotMatch(text,/CAROLINE_EVENTS|caroline-phone-events/)
+  assert.match(text,/\[\[env\.dev\.queues\.producers\]\][\s\S]*binding = "CAROLINE_EVENT_QUEUE"[\s\S]*queue = "caroline-phone-events-dev"/)
+  assert.match(text,/\[\[env\.dev\.queues\.consumers\]\][\s\S]*queue = "caroline-phone-events-dev"[\s\S]*dead_letter_queue = "caroline-phone-events-dev-dlq"/)
+  assert.doesNotMatch(text,/CAROLINE_EVENTS/)
   assert.doesNotMatch(text,/CORE_RUNTIME_URL|CORE_RUNTIME_KEY|EVENT_SINK_URL|EVENT_SINK_KEY/)
 })
