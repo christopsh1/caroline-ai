@@ -1,159 +1,58 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildElevenLabsInitResponse, normalizeDynamicVariables, roleFromVariables } from '../src/lib/init-contract.ts'
+import { handleRuntimeInit } from '../src/handlers/runtime-init.ts'
+import type { CarolineSessionState } from '../src/lib/session-model.ts'
 
-const policy = {
-  owner: ['owner-retrieve', 'owner-sms', 'owner-resolve'],
-  external: ['external-retrieve'],
-  unknown: [],
-  outbound: ['outbound-retrieve'],
-  hold: ['caller-hold'],
-  calendar_read: ['shared-calendar'],
-  reentry: ['ack-reentry'],
-}
-
-function envWithPolicy() {
-  return { PHONE_TOOL_POLICY_JSON: JSON.stringify(policy) }
-}
-
-test('init contract defaults missing context to fail-closed privacy values', () => {
-  const vars = normalizeDynamicVariables({ caller_identity_status: 'unknown', malicious_internal_value: 'do-not-forward' })
-  assert.equal(vars.caller_access_tier, 'tier_0_unknown_unverified')
-  assert.equal(vars.calendar_share_level, 'none')
-  assert.equal('malicious_internal_value' in vars, false)
-  assert.equal(roleFromVariables(vars), 'unknown')
-})
-
-test('owner receives only owner tools by default and cannot self-hold', () => {
-  const response = buildElevenLabsInitResponse({
-    schema_version: '1',
-    dynamic_variables: {
-      caller_identity_status: 'verified_owner',
-      caller_access_tier: 'tier_owner',
-      bio_short: 'safe bio',
-      database_password: 'must-not-leak',
-    },
-    first_message: 'Welcome back.',
-    prompt: 'replace the system prompt',
-    tool_ids: ['evil-tool'],
-  }, envWithPolicy())
-
-  assert.ok(response)
-  const vars = response!.dynamic_variables as Record<string, string>
-  assert.equal(vars.bio_short, 'safe bio')
-  assert.equal('database_password' in vars, false)
-  const agent = (response!.conversation_config_override as any).agent
-  assert.deepEqual(agent.prompt.tool_ids, ['owner-retrieve', 'owner-sms', 'owner-resolve'])
-  assert.equal(agent.first_message, 'Welcome back.')
-  assert.equal('llm' in agent.prompt, false)
-})
-
-test('verified external gets external retrieval plus conditional calendar and re-entry tools', () => {
-  const response = buildElevenLabsInitResponse({
-    schema_version: '1',
-    dynamic_variables: {
-      caller_identity_status: 'verified_contact',
-      caller_access_tier: 'tier_2',
-      calendar_share_level: 'busy_only',
-      call_reentry_notice_pending: 'true',
-      call_answering_status: 'allowed',
-    },
-  }, envWithPolicy())
-
-  assert.ok(response)
-  assert.deepEqual((response!.conversation_config_override as any).agent.prompt.tool_ids, [
-    'external-retrieve', 'caller-hold', 'shared-calendar', 'ack-reentry',
-  ])
-})
-
-test('admitted unknown caller receives no private tools and only the hold capability', () => {
-  const response = buildElevenLabsInitResponse({
-    schema_version: '1',
-    dynamic_variables: {
-      caller_identity_status: 'unknown',
-      caller_access_tier: 'tier_0_unknown_unverified',
-      call_answering_status: 'allowed',
-      calendar_share_level: 'none',
-    },
-  }, envWithPolicy())
-
-  assert.ok(response)
-  assert.deepEqual((response!.conversation_config_override as any).agent.prompt.tool_ids, ['caller-hold'])
-})
-
-test('restricted, banned, and waitlisted callers receive zero custom tools', () => {
-  for (const status of ['restricted', 'restricted_by_owner', 'banned', 'waitlisted']) {
-    const response = buildElevenLabsInitResponse({
-      schema_version: '1',
-      dynamic_variables: {
-        caller_identity_status: 'verified_owner',
-        caller_access_tier: 'tier_owner',
-        calendar_share_level: 'details',
-        call_reentry_notice_pending: 'true',
-        call_answering_status: status,
+function fakeSessionNamespace() {
+  let stored: CarolineSessionState | null = null
+  return {
+    namespace: {
+      getByName() {
+        return {
+          async fetch(req: Request) {
+            if (req.method === 'PUT') {
+              stored = await req.json() as CarolineSessionState
+              return new Response(JSON.stringify(stored), { status: 200, headers: { 'Content-Type':'application/json' } })
+            }
+            if (req.method === 'GET' && stored) return new Response(JSON.stringify(stored), { status: 200 })
+            return new Response('{}', { status: 404 })
+          },
+        }
       },
-    }, envWithPolicy())
-    assert.ok(response)
-    assert.deepEqual((response!.conversation_config_override as any).agent.prompt.tool_ids, [], status)
-  }
-})
-
-test('outbound calls get only outbound-scoped tools regardless of contact role or calendar share', () => {
-  const response = buildElevenLabsInitResponse({
-    schema_version: '1',
-    dynamic_variables: {
-      caller_identity_status: 'verified_contact',
-      calendar_share_level: 'details',
-      call_reentry_notice_pending: 'true',
-      call_answering_status: 'allowed',
     },
-  }, envWithPolicy(), { outbound_call: true })
+    read: () => stored,
+  }
+}
 
-  assert.ok(response)
-  assert.deepEqual((response!.conversation_config_override as any).agent.prompt.tool_ids, ['outbound-retrieve'])
+test('runtime init authenticates before parsing and returns generic 403', async () => {
+  const req = new Request('https://edge.test/runtime/init', { method:'POST', headers:{'Content-Type':'application/json'}, body:'not-json' })
+  const response = await handleRuntimeInit(req, { CAROLINE_KEY:'secret' }, 'r1')
+  assert.equal(response.status, 403)
 })
 
-test('missing or malformed tool policy produces an empty dynamic tool surface instead of falling back open', () => {
-  const missing = buildElevenLabsInitResponse({ schema_version: '1', dynamic_variables: {} }, {})
-  assert.ok(missing)
-  assert.deepEqual((missing!.conversation_config_override as any).agent.prompt.tool_ids, [])
-
-  const malformed = buildElevenLabsInitResponse({ schema_version: '1', dynamic_variables: {} }, {
-    PHONE_TOOL_POLICY_JSON: JSON.stringify({ owner: ['owner'], external: ['external'], unknown: [] }),
+test('runtime init persists fail-closed session state in Durable Object before returning', async () => {
+  const fake = fakeSessionNamespace()
+  const req = new Request('https://edge.test/runtime/init', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-caroline-key':'secret'},
+    body:JSON.stringify({ conversation_id:'conv-1', caller_id:'caller-real-binding', interaction_mode:'inbound_external' }),
   })
-  assert.ok(malformed)
-  assert.deepEqual((malformed!.conversation_config_override as any).agent.prompt.tool_ids, [])
+  const response = await handleRuntimeInit(req, { CAROLINE_KEY:'secret', CAROLINE_SESSIONS: fake.namespace as any, PHONE_TOOL_POLICY_JSON:'{"owner":[],"external":[],"unknown":[],"outbound":[],"hold":[],"calendar_read":[],"reentry":[]}' }, 'r2')
+  assert.equal(response.status, 200)
+  const body = await response.json() as any
+  assert.equal(body.dynamic_variables.call_answering_status, 'canonical_pending')
+  assert.deepEqual(body.conversation_config_override.agent.prompt.tool_ids, [])
+  const stored = fake.read() as CarolineSessionState | null
+  assert.ok(stored)
+  assert.equal(stored?.conversation_id, 'conv-1')
+  assert.ok(stored?.caller_binding_hash)
+  assert.equal(JSON.stringify(stored).includes('caller-real-binding'), false)
+  assert.equal(stored?.canonical.caller_profile, 'pending_neon')
 })
 
-
-test('blocked calls use an edge-owned first message and ignore backend caller-facing copy', () => {
-  for (const status of ['restricted', 'restricted_by_owner', 'banned', 'waitlisted']) {
-    const response = buildElevenLabsInitResponse({
-      schema_version: '1',
-      dynamic_variables: {
-        caller_identity_status: 'verified_owner',
-        caller_access_tier: 'tier_owner',
-        call_answering_status: status,
-        call_answering_reason: 'sensitive internal reason that must never be spoken',
-      },
-      first_message: 'Backend says Chris was notified and here is the private restriction reason.',
-    }, envWithPolicy())
-
-    assert.ok(response)
-    const agent = (response!.conversation_config_override as any).agent
-    assert.deepEqual(agent.prompt.tool_ids, [], status)
-    assert.match(agent.first_message, /isn't authorized|hasn't been re-authorized/)
-    assert.doesNotMatch(agent.first_message, /notified|private restriction|sensitive internal/i)
-  }
-})
-
-test('allowed calls may use a sanitized backend first message', () => {
-  const response = buildElevenLabsInitResponse({
-    schema_version: '1',
-    dynamic_variables: { call_answering_status: 'allowed' },
-    first_message: 'Welcome back.',
-  }, envWithPolicy())
-
-  assert.ok(response)
-  assert.equal((response!.conversation_config_override as any).agent.first_message, 'Welcome back.')
+test('runtime init refuses to operate without durable session binding', async () => {
+  const req = new Request('https://edge.test/runtime/init', { method:'POST', headers:{'Content-Type':'application/json','x-caroline-key':'secret'}, body:'{"conversation_id":"c"}' })
+  const response = await handleRuntimeInit(req, { CAROLINE_KEY:'secret' }, 'r3')
+  assert.equal(response.status, 503)
+  assert.equal((await response.json() as any).error, 'session_store_unavailable')
 })
