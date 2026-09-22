@@ -1,0 +1,32 @@
+{
+  "owner": {
+    "name": "retrieve_caroline_context_owner_phone",
+    "method": "POST",
+    "path": "/runtime/retrieve",
+    "constant_interaction_mode": "inbound_owner",
+    "required_dynamic_variables": {
+      "conversation_id": "system__conversation_id",
+      "caller_phone": "system__caller_id"
+    }
+  },
+  "external": {
+    "name": "retrieve_caroline_context_external_phone",
+    "method": "POST",
+    "path": "/runtime/retrieve",
+    "constant_interaction_mode": "inbound_external",
+    "required_dynamic_variables": {
+      "conversation_id": "system__conversation_id",
+      "caller_phone": "system__caller_id"
+    }
+  },
+  "outbound": {
+    "name": "retrieve_caroline_context_outbound",
+    "method": "POST",
+    "path": "/runtime/retrieve",
+    "constant_interaction_mode": "outbound",
+    "required_dynamic_variables": {
+      "conversation_id": "system__conversation_id",
+      "caller_phone": "system__caller_id"
+    }
+  }
+}
