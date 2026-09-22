@@ -19,3 +19,17 @@ If `call_answering_status` is anything except `allowed`, the edge returns an emp
 Never put transient tool IDs returned by an old init service into this policy. Each capability must correspond to an ElevenLabs workspace tool that can be fetched directly from the tool registry and whose URL points at the Cloudflare development/production facade. IDs are environment configuration, not source-code constants.
 
 The September 2026 legacy path violated this rule: dynamically returned tool IDs later disappeared from the workspace registry and caused call-start failures. The refactor intentionally removes that failure mode.
+
+## Stable phone action endpoints (v3.5)
+
+The dynamic tool policy now points to stable ElevenLabs tool documents whose URLs terminate at the edge:
+
+- `POST /runtime/phone/contact-resolve` — verified owner only.
+- `POST /runtime/phone/sms` — verified owner only; immediate or scheduled SMS.
+- `POST /runtime/phone/calendar-read` — only when the init context grants a non-`none` calendar share level.
+- `POST /runtime/phone/hold` — admitted non-owner inbound callers only; never exposed to the verified owner.
+- `POST /runtime/phone/reentry-ack` — only for the one call carrying a pending re-entry notice.
+
+Every action includes `conversation_id`. The future core MUST resolve the authoritative conversation/session from that ID and derive caller identity, caller phone, admission state, permissions, and owner status from server-side state. It MUST NOT authorize from a caller-provided phone number or other model-supplied identity field.
+
+The edge still sanitizes successful core responses and converts unauthorized results to fail-closed states. Dynamic tool exposure is defense-in-depth, not the authorization boundary.
