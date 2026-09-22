@@ -1,3 +1,11 @@
+declare module 'cloudflare:workers' {
+  export class DurableObject<Env = unknown> {
+    protected ctx: DurableObjectState
+    protected env: Env
+    constructor(ctx: DurableObjectState, env: Env)
+  }
+}
+
 interface KVNamespace {
   get(key: string): Promise<string | null>
   put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>
@@ -25,4 +33,21 @@ interface Message<T = unknown> {
 
 interface MessageBatch<T = unknown> {
   messages: Message<T>[]
+}
+
+interface DurableObjectStorage {
+  get<T = unknown>(key: string): Promise<T | undefined>
+  put<T = unknown>(key: string, value: T): Promise<void>
+}
+
+interface DurableObjectState {
+  storage: DurableObjectStorage
+}
+
+interface DurableObjectStub {
+  fetch(request: Request): Promise<Response>
+}
+
+interface DurableObjectNamespace {
+  getByName(name: string): DurableObjectStub
 }
