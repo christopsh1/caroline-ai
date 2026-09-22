@@ -6,7 +6,8 @@ export interface Env {
   TWILIO_AUTH_TOKEN?: string
   Caroline_Phone?: KVNamespace
   CAROLINE_PAYLOADS?: R2Bucket
-  CAROLINE_EVENTS?: Queue<QueuedEventPointer>
+  CAROLINE_EVENT_QUEUE?: Queue<QueuedEventPointer>
+  CAROLINE_EVENT_DLQ?: Queue<QueuedEventPointer>
   CAROLINE_SESSIONS?: DurableObjectNamespace
 }
 
