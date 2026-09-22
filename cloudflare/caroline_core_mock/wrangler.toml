@@ -1,0 +1,25 @@
+name = "caroline-core-mock"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[env.dev]
+name = "caroline-core-mock-dev"
+
+[env.dev.vars]
+ENVIRONMENT = "development"
+
+# Development-only strongly-consistent session/event state.
+# [[env.dev.r2_buckets]]
+# binding = "MOCK_STATE"
+# bucket_name = "caroline-core-mock-state-dev"
+
+# Secrets (never commit values):
+#   CORE_RUNTIME_KEY  - must equal caroline-phone-dev CORE_RUNTIME_KEY
+#   EVENT_SINK_KEY    - must equal caroline-phone-dev EVENT_SINK_KEY
+#
+# Optional non-secret JSON fixture override using dummy/test data only:
+#   MOCK_CALLER_PROFILES_JSON
