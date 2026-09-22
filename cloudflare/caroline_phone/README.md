@@ -1,4 +1,4 @@
-# Caroline Phone Edge (Cloudflare) v3.7
+# Caroline Phone Edge (Cloudflare) v3.8
 
 Backend-neutral Cloudflare edge and runtime facade for Caroline.
 
@@ -34,7 +34,7 @@ The queue never contains the full transcript/event payload. Full envelopes are s
 - R2 binding `CAROLINE_PAYLOADS`
 - Queue producer binding `CAROLINE_EVENTS`
 
-Twilio remains gated behind `TWILIO_AUTH_TOKEN` and `TWILIO_PUBLIC_BASE_URL` plus a completed validator.
+Twilio validation requires `TWILIO_AUTH_TOKEN` and the exact `TWILIO_PUBLIC_BASE_URL`; routing remains disabled after successful verification until the downstream call/SMS route is implemented.
 
 ## Phone tool policy
 The init facade uses composable least-privilege capability buckets. See `PHONE_TOOL_POLICY.md` and `config/phone-tool-policy.example.json`. Restricted/waitlisted/banned calls receive zero custom tools; calendar and re-entry tools are conditional.
@@ -45,8 +45,12 @@ The edge now exposes five narrow action contracts under `/runtime/phone/*`: cont
 
 The core authorization contract is conversation-bound: it must derive caller identity and permissions from authoritative server-side state keyed by `conversation_id`. Model-supplied phone/identity fields are never sufficient authorization.
 
-## Deterministic blocked-call admission (v3.7)
+## Deterministic blocked-call admission (v3.8)
 
 Call admission is enforced at the Cloudflare initialization boundary, before the model receives a custom tool surface. If the core returns `restricted`, `restricted_by_owner`, `banned`, or `waitlisted`, the edge forces an empty custom-tool list and replaces any backend-supplied first message with fixed minimal Caroline-owned wording. Internal restriction reasons are never spoken automatically, and the edge does not claim that Chris was notified unless a future explicit contract proves that fact.
 
 This is defense in depth: the ElevenLabs prompt still respects admission state, but privacy does not depend on the model remembering that rule.
+
+## Twilio validation readiness (v3.8)
+
+Twilio ingress now implements exact-public-URL `X-Twilio-Signature` validation for form requests and JSON `bodySHA256` validation. The route remains fail-closed after successful authentication: verified Twilio traffic returns a routing-not-enabled response until the call/SMS routing contract is deliberately implemented and tested.
