@@ -25,7 +25,7 @@ export async function handleElevenLabsWebhook(req: Request, env: Env, requestId:
   let rawBody: string
   try { ({ rawBody } = await readBodyWithLimit(req, MAX_BODY_BYTES)) } catch (error) {
     if (error instanceof RequestBodyTooLargeError) {
-      log('warn', 'elevenlabs_body_rejected', { request_id: requestId, reason: error.message })
+      log('warn', 'elevenlabs_body_rejected', { request_id: requestId })
       return json({ error: 'payload_too_large' }, 413, requestId)
     }
     throw error
@@ -33,8 +33,8 @@ export async function handleElevenLabsWebhook(req: Request, env: Env, requestId:
 
   const verification = await verifyElevenLabsSignature(rawBody, req.headers.get('ElevenLabs-Signature'), env.ELEVENLABS_WEBHOOK_SECRET)
   if (!verification.ok) {
-    log('warn', 'elevenlabs_signature_rejected', { request_id: requestId, reason: verification.reason })
-    return json({ error: verification.reason }, verification.reason === 'webhook_secret_not_configured' ? 503 : 401, requestId)
+    log('warn', 'elevenlabs_signature_rejected', { request_id: requestId })
+    return json({ error: 'forbidden' }, 403, requestId)
   }
 
   let event: ElevenLabsEvent
