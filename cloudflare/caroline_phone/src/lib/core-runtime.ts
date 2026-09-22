@@ -1,7 +1,14 @@
 import type { Env } from '../types.ts'
 import { signCarolinePayload, verifyCarolinePayloadSignature } from './security.ts'
 
-export type CoreOperation = 'init' | 'retrieve'
+export type CoreOperation =
+  | 'init'
+  | 'retrieve'
+  | 'phone_contact_resolve'
+  | 'phone_sms'
+  | 'phone_calendar_read'
+  | 'phone_hold'
+  | 'phone_reentry_ack'
 
 export type CoreCallResult =
   | { ok: true; body: unknown; status: number }
@@ -28,8 +35,16 @@ function endpointFor(baseUrl: string, operation: CoreOperation): URL | null {
     return null
   }
   if (base.protocol !== 'https:') return null
-  const path = operation === 'init' ? '/v1/init' : '/v1/retrieve'
-  return new URL(path, base)
+  const paths: Record<CoreOperation, string> = {
+    init: '/v1/init',
+    retrieve: '/v1/retrieve',
+    phone_contact_resolve: '/v1/phone/contact-resolve',
+    phone_sms: '/v1/phone/sms',
+    phone_calendar_read: '/v1/phone/calendar-read',
+    phone_hold: '/v1/phone/hold',
+    phone_reentry_ack: '/v1/phone/reentry-ack',
+  }
+  return new URL(paths[operation], base)
 }
 
 export async function callCoreRuntime(
