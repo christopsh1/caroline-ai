@@ -1,4 +1,5 @@
 name = "caroline-phone"
+account_id = "882fc7501e4632c7c58879d5c1d5b672"
 main = "src/index.ts"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
@@ -6,71 +7,72 @@ compatibility_flags = ["nodejs_compat"]
 [observability]
 enabled = true
 
-# Cloudflare bindings are non-inheritable across named environments.
-# Insert the confirmed live resource IDs/names into BOTH environment blocks.
-# `Caroline_Phone` KV may be shared because keys are environment-prefixed.
-# R2 and Queues should remain environment-separated.
-
 [env.dev]
 name = "caroline-phone-dev"
 
 [env.dev.vars]
 ENVIRONMENT = "development"
-TWILIO_INGRESS_ENABLED = "false"
 
-# [[env.dev.kv_namespaces]]
-# binding = "CAROLINE_PHONE"
-# id = "<LIVE_CAROLINE_PHONE_KV_NAMESPACE_ID>"
-# [[env.dev.r2_buckets]]
-# binding = "CAROLINE_PAYLOADS"
-# bucket_name = "caroline-phone-payloads-dev"
-# [[env.dev.queues.producers]]
-# binding = "CAROLINE_EVENTS"
-# queue = "caroline-phone-events-dev"
-# [[env.dev.queues.consumers]]
-# queue = "caroline-phone-events-dev"
-# max_batch_size = 5
-# max_batch_timeout = 2
-# max_retries = 5
-# dead_letter_queue = "caroline-phone-events-dev-dlq"
-# retry_delay = 30
+[env.dev.secrets]
+required = [
+  "CAROLINE_KEY",
+  "CORE_RUNTIME_KEY",
+  "ELEVENLABS_WEBHOOK_SECRET",
+  "TWILIO_AUTH_TOKEN",
+  "EVENT_SINK_KEY",
+]
+
+[[env.dev.kv_namespaces]]
+binding = "Caroline_Phone"
+id = "85679a0030e846ee931226aa1a6e6332"
+
+[[env.dev.r2_buckets]]
+binding = "CAROLINE_PAYLOADS"
+bucket_name = "caroline-phone-payloads-dev"
+
+[[env.dev.queues.producers]]
+binding = "CAROLINE_EVENTS"
+queue = "caroline-phone-events-dev"
+
+[[env.dev.queues.consumers]]
+queue = "caroline-phone-events-dev"
+max_batch_size = 5
+max_batch_timeout = 2
+max_retries = 5
+dead_letter_queue = "caroline-phone-events-dev-dlq"
+retry_delay = 30
 
 [env.production]
 name = "caroline-phone"
 
 [env.production.vars]
 ENVIRONMENT = "production"
-TWILIO_INGRESS_ENABLED = "false"
 
-# [[env.production.kv_namespaces]]
-# binding = "CAROLINE_PHONE"
-# id = "<LIVE_CAROLINE_PHONE_KV_NAMESPACE_ID>"
-# [[env.production.r2_buckets]]
-# binding = "CAROLINE_PAYLOADS"
-# bucket_name = "caroline-phone-payloads"
-# [[env.production.queues.producers]]
-# binding = "CAROLINE_EVENTS"
-# queue = "caroline-phone-events"
-# [[env.production.queues.consumers]]
-# queue = "caroline-phone-events"
-# max_batch_size = 5
-# max_batch_timeout = 2
-# max_retries = 5
-# dead_letter_queue = "caroline-phone-events-dlq"
-# retry_delay = 30
+[env.production.secrets]
+required = [
+  "CAROLINE_KEY",
+  "CORE_RUNTIME_KEY",
+  "ELEVENLABS_WEBHOOK_SECRET",
+  "TWILIO_AUTH_TOKEN",
+  "EVENT_SINK_KEY",
+]
 
-# Environment-specific secrets, never committed:
-#   CAROLINE_RUNTIME_KEY
-#   ELEVENLABS_WEBHOOK_SECRET
-#   EVENT_SINK_URL
-#   EVENT_SINK_KEY
-# Twilio validation gate (routing remains disabled):
-#   TWILIO_AUTH_TOKEN
-#   TWILIO_PUBLIC_BASE_URL
+[[env.production.kv_namespaces]]
+binding = "Caroline_Phone"
+id = "85679a0030e846ee931226aa1a6e6332"
 
-# Runtime-facade configuration is environment-specific and intentionally absent
-# until a replacement core is selected/deployed:
-#   CORE_RUNTIME_URL       (HTTPS base origin; edge calls /v1/init and /v1/retrieve)
-#   PHONE_TOOL_POLICY_JSON (owner/external/unknown tool-id arrays)
-# Secret:
-#   CORE_RUNTIME_KEY
+[[env.production.r2_buckets]]
+binding = "CAROLINE_PAYLOADS"
+bucket_name = "caroline-phone-payloads"
+
+[[env.production.queues.producers]]
+binding = "CAROLINE_EVENTS"
+queue = "caroline-phone-events"
+
+[[env.production.queues.consumers]]
+queue = "caroline-phone-events"
+max_batch_size = 5
+max_batch_timeout = 2
+max_retries = 5
+dead_letter_queue = "caroline-phone-events-dlq"
+retry_delay = 30
