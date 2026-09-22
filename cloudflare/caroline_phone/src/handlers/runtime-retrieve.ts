@@ -10,6 +10,7 @@ const RETRIEVE_RESPONSE_MAX_BYTES = 96 * 1024
 const MODES = new Set(['inbound_owner', 'inbound_external', 'outbound'])
 
 interface RetrievalInput {
+  conversation_id: string
   caller_phone: string
   interaction_mode: 'inbound_owner' | 'inbound_external' | 'outbound'
   current_query: string
@@ -25,12 +26,14 @@ function validText(value: unknown, max: number, required = true): value is strin
 function parseInput(value: unknown): RetrievalInput | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const body = value as Record<string, unknown>
+  if (!validText(body.conversation_id, 256)) return null
   if (!validText(body.caller_phone, 128)) return null
   if (typeof body.interaction_mode !== 'string' || !MODES.has(body.interaction_mode)) return null
   if (!validText(body.current_query, 4000)) return null
   if (!validText(body.recent_turns, 12000, false)) return null
   if (!validText(body.session_summary, 6000, false)) return null
   return {
+    conversation_id: body.conversation_id as string,
     caller_phone: body.caller_phone as string,
     interaction_mode: body.interaction_mode as RetrievalInput['interaction_mode'],
     current_query: body.current_query as string,
