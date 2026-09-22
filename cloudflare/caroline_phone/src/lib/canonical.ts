@@ -50,29 +50,70 @@ export interface CanonicalRagContext {
   results: Array<{ text: string; type?: string; timestamp?: string }>
 }
 
-export interface CanonicalConfig { revision: string }
-export interface CanonicalContactResolution { unique: boolean; candidates: Array<{ display_name: string; phone: string; contact_ref?: string }> }
-export interface CanonicalSmsResult { accepted: boolean; disposition: 'sent' | 'scheduled' | 'queued' | 'rejected'; execute_at?: string }
-export interface CanonicalCalendarResult { share_level: 'none' | 'busy_only' | 'title' | 'details'; events: Array<Record<string, unknown>> }
-export interface CanonicalEventDelivery { status: number }
+export interface CanonicalConfig {
+  revision: string
+}
+
+export interface CanonicalContactResolution {
+  unique: boolean
+  candidates: Array<{ display_name: string; phone: string; contact_ref?: string }>
+}
+
+export interface CanonicalSmsResult {
+  accepted: boolean
+  disposition: 'sent' | 'scheduled' | 'queued' | 'rejected'
+  execute_at?: string
+}
+
+export interface CanonicalCalendarResult {
+  share_level: 'none' | 'busy_only' | 'title' | 'details'
+  events: Array<Record<string, unknown>>
+}
+
+export interface CanonicalEventDelivery {
+  status: number
+}
 
 function pending<T>(): CanonicalResult<T> {
   return { status: 'pending_neon', integration: PENDING_NEON_INTEGRATION }
 }
 
 // PENDING_NEON_INTEGRATION: canonical identity must come from Neon once Neon exists.
-export async function getCanonicalCallerProfile(_env: Env, _input: Record<string, unknown>): Promise<CanonicalResult<CanonicalCallerProfile>> { return pending() }
+export async function getCanonicalCallerProfile(_env: Env, _input: Record<string, unknown>): Promise<CanonicalResult<CanonicalCallerProfile>> {
+  return pending()
+}
+
 // PENDING_NEON_INTEGRATION: disclosure/action permissions must come from Neon once Neon exists.
-export async function getCanonicalPermissions(_env: Env, _input: Record<string, unknown>): Promise<CanonicalResult<CanonicalPermissions>> { return pending() }
+export async function getCanonicalPermissions(_env: Env, _input: Record<string, unknown>): Promise<CanonicalResult<CanonicalPermissions>> {
+  return pending()
+}
+
 // PENDING_NEON_INTEGRATION: RAG/memory retrieval must come from Neon once Neon exists.
-export async function getCanonicalRagContext(_env: Env, _input: Record<string, unknown>): Promise<CanonicalResult<CanonicalRagContext>> { return pending() }
+export async function getCanonicalRagContext(_env: Env, _input: Record<string, unknown>): Promise<CanonicalResult<CanonicalRagContext>> {
+  return pending()
+}
+
 // PENDING_NEON_INTEGRATION: canonical cross-system config must come from Neon once Neon exists.
-export async function loadCanonicalConfig(_env: Env): Promise<CanonicalResult<CanonicalConfig>> { return pending() }
+export async function loadCanonicalConfig(_env: Env): Promise<CanonicalResult<CanonicalConfig>> {
+  return pending()
+}
+
 // PENDING_NEON_INTEGRATION: contact resolution is not faked at the edge.
-export async function resolveCanonicalContact(_env: Env, _input: Record<string, unknown>): Promise<CanonicalResult<CanonicalContactResolution>> { return pending() }
+export async function resolveCanonicalContact(_env: Env, _input: Record<string, unknown>): Promise<CanonicalResult<CanonicalContactResolution>> {
+  return pending()
+}
+
 // PENDING_NEON_INTEGRATION: SMS persistence/authorization/provider execution is not faked at the edge.
-export async function sendCanonicalSms(_env: Env, _input: Record<string, unknown>): Promise<CanonicalResult<CanonicalSmsResult>> { return pending() }
+export async function sendCanonicalSms(_env: Env, _input: Record<string, unknown>): Promise<CanonicalResult<CanonicalSmsResult>> {
+  return pending()
+}
+
 // PENDING_NEON_INTEGRATION: calendar data is not invented at the edge.
-export async function getCanonicalCalendar(_env: Env, _input: Record<string, unknown>): Promise<CanonicalResult<CanonicalCalendarResult>> { return pending() }
+export async function getCanonicalCalendar(_env: Env, _input: Record<string, unknown>): Promise<CanonicalResult<CanonicalCalendarResult>> {
+  return pending()
+}
+
 // PENDING_NEON_INTEGRATION: event delivery remains retryable until a canonical sink exists.
-export async function deliverCanonicalEvent(_env: Env, _envelope: CarolineEventEnvelope): Promise<CanonicalResult<CanonicalEventDelivery>> { return pending() }
+export async function deliverCanonicalEvent(_env: Env, _envelope: CarolineEventEnvelope): Promise<CanonicalResult<CanonicalEventDelivery>> {
+  return pending()
+}
