@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "check": "npm run typecheck && npm test",
+    "provision:dev": "node scripts/provision-cloudflare-dev.mjs",
     "secrets:list:dev": "wrangler secret list --env dev",
     "secrets:list:prod": "wrangler secret list --env production",
     "smoke": "node scripts/smoke.mjs",
