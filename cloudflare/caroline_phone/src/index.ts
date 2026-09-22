@@ -1,6 +1,7 @@
 import { handleElevenLabsWebhook } from './handlers/elevenlabs.ts'
 import { handleRuntimeInit } from './handlers/runtime-init.ts'
 import { handleRuntimeRetrieve } from './handlers/runtime-retrieve.ts'
+import { handleRuntimePhoneAction, type PhoneAction } from './handlers/runtime-phone.ts'
 import { handleStatus } from './handlers/status.ts'
 import { handleTwilioWebhook } from './handlers/twilio.ts'
 import { consumeEventBatch } from './lib/consumer.ts'
@@ -17,7 +18,7 @@ export default {
     const url = new URL(req.url)
     try {
       if (url.pathname === '/health' && req.method === 'GET') {
-        return json({ ok: true, service: 'caroline_phone', release: '3.4.0' }, 200, requestId)
+        return json({ ok: true, service: 'caroline_phone', release: '3.5.0' }, 200, requestId)
       }
       if (url.pathname === '/status' && req.method === 'GET') {
         if (!verifyRuntimeKey(req, env.CAROLINE_RUNTIME_KEY)) return json({ error: 'unauthorized' }, 401, requestId)
@@ -25,6 +26,13 @@ export default {
       }
       if (url.pathname === '/runtime/init') return await handleRuntimeInit(req, env, requestId)
       if (url.pathname === '/runtime/retrieve') return await handleRuntimeRetrieve(req, env, requestId)
+      if (url.pathname.startsWith('/runtime/phone/')) {
+        const action = url.pathname.slice('/runtime/phone/'.length) as PhoneAction
+        if (!['contact-resolve', 'sms', 'calendar-read', 'hold', 'reentry-ack'].includes(action)) {
+          return json({ error: 'not_found' }, 404, requestId)
+        }
+        return await handleRuntimePhoneAction(req, env, requestId, action)
+      }
       if (url.pathname === '/webhook/elevenlabs') return await handleElevenLabsWebhook(req, env, requestId)
       if (url.pathname.startsWith('/webhook/twilio')) return handleTwilioWebhook(env, requestId)
       return json({ error: 'not_found' }, 404, requestId)
