@@ -26,20 +26,6 @@ async function sha256Hex(value: string): Promise<string> {
   return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-function rawPathAndQuery(url: string): string {
-  const scheme = url.indexOf('://')
-  if (scheme < 0) return '/'
-  const path = url.indexOf('/', scheme + 3)
-  return path < 0 ? '/' : url.slice(path)
-}
-
-export function twilioPublicUrl(req: Request, publicBaseUrl: string | undefined): string | null {
-  if (!publicBaseUrl) return null
-  const base = publicBaseUrl.replace(/\/+$/, '')
-  if (!base.startsWith('https://') || /[?#]/.test(base.slice('https://'.length))) return null
-  return `${base}${rawPathAndQuery(req.url)}`
-}
-
 function formParams(rawBody: string): Record<string, string | string[]> {
   const values = new Map<string, string[]>()
   new URLSearchParams(rawBody).forEach((value, key) => {
@@ -48,8 +34,8 @@ function formParams(rawBody: string): Record<string, string | string[]> {
     values.set(key, existing)
   })
   return Object.fromEntries([...values].map(([key, raw]) => {
-    const unique = [...new Set(raw)].sort()
-    return [key, unique.length === 1 ? unique[0] : unique]
+    const uniqueSorted = [...new Set(raw)].sort()
+    return [key, uniqueSorted.length === 1 ? uniqueSorted[0] : uniqueSorted]
   }))
 }
 
@@ -73,35 +59,27 @@ export async function verifyTwilioRequest(
   req: Request,
   rawBody: string,
   authToken: string | undefined,
-  publicBaseUrl: string | undefined,
-): Promise<{ ok: boolean; reason?: string; public_url?: string }> {
-  if (!authToken) return { ok: false, reason: 'twilio_auth_token_not_configured' }
-  const publicUrl = twilioPublicUrl(req, publicBaseUrl)
-  if (!publicUrl) return { ok: false, reason: 'twilio_public_base_url_not_configured' }
+): Promise<boolean> {
+  if (!authToken) return false
   const supplied = req.headers.get('X-Twilio-Signature') ?? ''
-  if (!supplied) return { ok: false, reason: 'twilio_signature_missing', public_url: publicUrl }
+  if (!supplied) return false
 
+  const publicUrl = req.url
   const contentType = (req.headers.get('content-type') ?? '').toLowerCase()
   let expected: string
 
   if (contentType.includes('application/json')) {
-    const queryIndex = publicUrl.indexOf('?')
-    const bodyHash = queryIndex >= 0 ? new URLSearchParams(publicUrl.slice(queryIndex + 1)).get('bodySHA256') : null
-    if (!bodyHash) return { ok: false, reason: 'twilio_body_sha256_missing', public_url: publicUrl }
-    const actualBodyHash = await sha256Hex(rawBody)
-    if (!timingSafeEqual(actualBodyHash, bodyHash.toLowerCase())) {
-      return { ok: false, reason: 'twilio_body_sha256_invalid', public_url: publicUrl }
-    }
+    const bodyHash = new URL(publicUrl).searchParams.get('bodySHA256')
+    if (!bodyHash) return false
+    if (!timingSafeEqual(await sha256Hex(rawBody), bodyHash.toLowerCase())) return false
     expected = await expectedTwilioSignature(authToken, publicUrl)
   } else if (req.method === 'POST' && contentType.includes('application/x-www-form-urlencoded')) {
     expected = await expectedTwilioSignature(authToken, publicUrl, formParams(rawBody))
   } else if (req.method === 'GET') {
     expected = await expectedTwilioSignature(authToken, publicUrl)
   } else {
-    return { ok: false, reason: 'twilio_content_type_unsupported', public_url: publicUrl }
+    return false
   }
 
   return timingSafeEqual(expected, supplied)
-    ? { ok: true, public_url: publicUrl }
-    : { ok: false, reason: 'twilio_signature_invalid', public_url: publicUrl }
 }
