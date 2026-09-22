@@ -30,7 +30,7 @@ test('runtime init maps signed core context into exact ElevenLabs client-data sh
     const req = new Request('https://edge.test/runtime/init', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-caroline-key': runtimeKey },
-      body: JSON.stringify({ caller_id: '+10000000000', conversation_id: 'c1' }),
+      body: JSON.stringify({ caller_id: 'caller-fixture', conversation_id: 'c1' }),
     })
     const response = await handleRuntimeInit(req, {
       CAROLINE_RUNTIME_KEY: runtimeKey,
@@ -61,7 +61,7 @@ test('runtime retrieval returns a sanitized authorized envelope', async () => {
     const req = new Request('https://edge.test/runtime/retrieve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-caroline-key': runtimeKey },
-      body: JSON.stringify({ caller_phone: '+10000000000', interaction_mode: 'inbound_external', current_query: 'What did we discuss?' }),
+      body: JSON.stringify({ conversation_id: 'c1', caller_phone: 'caller-fixture', interaction_mode: 'inbound_external', current_query: 'What did we discuss?' }),
     })
     const response = await handleRuntimeRetrieve(req, {
       CAROLINE_RUNTIME_KEY: runtimeKey,
@@ -77,4 +77,18 @@ test('runtime retrieval returns a sanitized authorized envelope', async () => {
   } finally {
     ;(globalThis as any).fetch = originalFetch
   }
+})
+
+test('runtime retrieval requires conversation_id for conversation-bound authorization', async () => {
+  const req = new Request('https://edge.test/runtime/retrieve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-caroline-key': runtimeKey },
+    body: JSON.stringify({ caller_phone: 'caller-fixture', interaction_mode: 'inbound_external', current_query: 'What did we discuss?' }),
+  })
+  const response = await handleRuntimeRetrieve(req, {
+    CAROLINE_RUNTIME_KEY: runtimeKey,
+    CORE_RUNTIME_URL: 'https://core.example.test',
+    CORE_RUNTIME_KEY: coreKey,
+  }, 'req-4')
+  assert.equal(response.status, 400)
 })
