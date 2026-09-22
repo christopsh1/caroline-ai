@@ -1,4 +1,4 @@
-# Caroline Phone Edge (Cloudflare) v3.4
+# Caroline Phone Edge (Cloudflare) v3.6
 
 Backend-neutral Cloudflare edge and runtime facade for Caroline.
 
@@ -39,3 +39,17 @@ Twilio remains gated behind `TWILIO_AUTH_TOKEN` and `TWILIO_PUBLIC_BASE_URL` plu
 
 ## Phone tool policy
 The init facade uses composable least-privilege capability buckets. See `PHONE_TOOL_POLICY.md` and `config/phone-tool-policy.example.json`. Restricted/waitlisted/banned calls receive zero custom tools; calendar and re-entry tools are conditional.
+
+
+### Stable phone actions (v3.5)
+
+The edge now exposes five narrow action contracts under `/runtime/phone/*`: contact resolution, owner SMS, permission-aware calendar read, caller hold, and one-time re-entry acknowledgement. These routes are deliberately not a generic proxy. All require edge authentication, bounded JSON bodies, a `conversation_id`, a signed core response, and response sanitization.
+
+The core authorization contract is conversation-bound: it must derive caller identity and permissions from authoritative server-side state keyed by `conversation_id`. Model-supplied phone/identity fields are never sufficient authorization.
+
+
+## Deterministic blocked-call admission (v3.6)
+
+Call admission is enforced at the Cloudflare initialization boundary, before the model receives a custom tool surface. If the core returns `restricted`, `restricted_by_owner`, `banned`, or `waitlisted`, the edge forces an empty custom-tool list and replaces any backend-supplied first message with fixed minimal Caroline-owned wording. Internal restriction reasons are never spoken automatically, and the edge does not claim that Chris was notified unless a future explicit contract proves that fact.
+
+This is defense in depth: the ElevenLabs prompt still respects admission state, but privacy does not depend on the model remembering that rule.
