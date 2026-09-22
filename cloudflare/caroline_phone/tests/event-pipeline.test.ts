@@ -21,7 +21,7 @@ test('verified ElevenLabs event is durably staged and queued even while Neon del
   const raw=JSON.stringify({type:'post_call_transcription',event_timestamp:ts,data:{conversation_id:'conv'}})
   const sig=await hmacSha256Hex(secret,`${ts}.${raw}`)
   const req=new Request('https://edge.test/webhook/elevenlabs',{method:'POST',headers:{'Content-Type':'application/json','ElevenLabs-Signature':`t=${ts},v0=${sig}`},body:raw})
-  const response=await handleElevenLabsWebhook(req,{ENVIRONMENT:'development',ELEVENLABS_WEBHOOK_SECRET:secret,CAROLINE_PAYLOADS:r2 as any,CAROLINE_EVENTS:q as any},'r')
+  const response=await handleElevenLabsWebhook(req,{ENVIRONMENT:'development',ELEVENLABS_WEBHOOK_SECRET:secret,CAROLINE_PAYLOADS:r2 as any,CAROLINE_EVENT_QUEUE:q as any},'r')
   assert.equal(response.status,200)
   assert.equal(queued.length,1)
   assert.equal(r2.objects.size,1)
