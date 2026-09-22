@@ -16,11 +16,11 @@ function receiptKey(env: Env, eventId: string): string {
 }
 
 export async function likelyAlreadyDelivered(env: Env, eventId: string): Promise<boolean> {
-  if (!env.CAROLINE_PHONE) return false
-  return (await env.CAROLINE_PHONE.get(receiptKey(env, eventId))) !== null
+  if (!env.Caroline_Phone) return false
+  return (await env.Caroline_Phone.get(receiptKey(env, eventId))) !== null
 }
 
 export async function recordReceipt(env: Env, metadata: ReceiptMetadata): Promise<void> {
-  if (!env.CAROLINE_PHONE) return
-  await env.CAROLINE_PHONE.put(receiptKey(env, metadata.event_id), JSON.stringify(metadata), { expirationTtl: 60 * 60 * 24 * 7 })
+  if (!env.Caroline_Phone) return
+  await env.Caroline_Phone.put(receiptKey(env, metadata.event_id), JSON.stringify(metadata), { expirationTtl: 60 * 60 * 24 * 7 })
 }
