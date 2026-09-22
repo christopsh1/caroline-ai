@@ -14,7 +14,7 @@ async function signedCore(body: unknown, status = 200): Promise<Response> {
 }
 
 function env() {
-  return { CAROLINE_RUNTIME_KEY: runtimeKey, CORE_RUNTIME_URL: 'https://core.example.test', CORE_RUNTIME_KEY: coreKey }
+  return { CAROLINE_KEY: runtimeKey, CORE_RUNTIME_URL: 'https://core.example.test', CORE_RUNTIME_KEY: coreKey }
 }
 
 function req(path: string, body: unknown, key = runtimeKey): Request {
@@ -27,7 +27,7 @@ function req(path: string, body: unknown, key = runtimeKey): Request {
 
 test('phone actions require edge auth and conversation binding input', async () => {
   const unauthorized = await handleRuntimePhoneAction(req('hold', { conversation_id: 'c1' }, 'wrong'), env(), 'r1', 'hold')
-  assert.equal(unauthorized.status, 401)
+  assert.equal(unauthorized.status, 403)
 
   const missingConversation = await handleRuntimePhoneAction(req('hold', { reason_code: 'abuse' }), env(), 'r2', 'hold')
   assert.equal(missingConversation.status, 400)
@@ -42,17 +42,17 @@ test('contact resolve sends conversation id to core and strips internal fields',
       schema_version: '1',
       authorized: true,
       unique: true,
-      candidates: [{ display_name: 'Nicole', phone: '+15550000001', contact_ref: 'opaque-1', internal_id: 'db-uuid' }],
+      candidates: [{ display_name: 'Nicole', phone: 'fixture-b', contact_ref: 'opaque-1', internal_id: 'db-uuid' }],
       debug: 'secret',
     })
   }
   try {
-    const response = await handleRuntimePhoneAction(req('contact-resolve', { conversation_id: 'conv-1', name: 'Nicole', owner_phone: '+1999' }), env(), 'r3', 'contact-resolve')
+    const response = await handleRuntimePhoneAction(req('contact-resolve', { conversation_id: 'conv-1', name: 'Nicole', owner_phone: 'ignored-owner-fixture' }), env(), 'r3', 'contact-resolve')
     assert.equal(response.status, 200)
     assert.equal(outbound.input.conversation_id, 'conv-1')
     assert.equal(outbound.input.owner_phone, undefined)
     const body = await response.json() as any
-    assert.deepEqual(body, { authorized: true, unique: true, candidates: [{ display_name: 'Nicole', phone: '+15550000001', contact_ref: 'opaque-1' }] })
+    assert.deepEqual(body, { authorized: true, unique: true, candidates: [{ display_name: 'Nicole', phone: 'fixture-b', contact_ref: 'opaque-1' }] })
   } finally { ;(globalThis as any).fetch = originalFetch }
 })
 
@@ -60,7 +60,7 @@ test('unauthorized SMS can never echo sent state', async () => {
   const originalFetch = globalThis.fetch
   ;(globalThis as any).fetch = async () => signedCore({ schema_version: '1', authorized: false, accepted: true, disposition: 'sent', provider_id: 'leak' })
   try {
-    const response = await handleRuntimePhoneAction(req('sms', { conversation_id: 'conv-1', to_number: '+15550000002', message_summary: 'Hello' }), env(), 'r4', 'sms')
+    const response = await handleRuntimePhoneAction(req('sms', { conversation_id: 'conv-1', to_number: 'fixture-c', message_summary: 'Hello' }), env(), 'r4', 'sms')
     assert.equal(response.status, 200)
     assert.deepEqual(await response.json(), { authorized: false, accepted: false, disposition: 'rejected' })
   } finally { ;(globalThis as any).fetch = originalFetch }
@@ -72,7 +72,7 @@ test('authorized SMS exposes only accepted disposition and schedule time', async
     schema_version: '1', authorized: true, accepted: true, disposition: 'scheduled', execute_at: '2026-09-23T09:00:00-04:00', provider_id: 'private',
   })
   try {
-    const response = await handleRuntimePhoneAction(req('sms', { conversation_id: 'conv-1', to_number: '+15550000002', message_summary: 'Hello' }), env(), 'r5', 'sms')
+    const response = await handleRuntimePhoneAction(req('sms', { conversation_id: 'conv-1', to_number: 'fixture-c', message_summary: 'Hello' }), env(), 'r5', 'sms')
     assert.deepEqual(await response.json(), { authorized: true, accepted: true, disposition: 'scheduled', execute_at: '2026-09-23T09:00:00-04:00' })
   } finally { ;(globalThis as any).fetch = originalFetch }
 })
@@ -107,7 +107,7 @@ test('re-entry acknowledgement is fail closed and only returns bounded message',
   const originalFetch = globalThis.fetch
   ;(globalThis as any).fetch = async () => signedCore({ schema_version: '1', authorized: true, acknowledged: true, message: 'Prior issue noted. We can continue.', internal: 'hide' })
   try {
-    const response = await handleRuntimePhoneAction(req('reentry-ack', { conversation_id: 'conv-1', caller_phone: '+1999' }), env(), 'r8', 'reentry-ack')
+    const response = await handleRuntimePhoneAction(req('reentry-ack', { conversation_id: 'conv-1', caller_phone: 'ignored-caller-fixture' }), env(), 'r8', 'reentry-ack')
     assert.deepEqual(await response.json(), { authorized: true, acknowledged: true, message: 'Prior issue noted. We can continue.' })
   } finally { ;(globalThis as any).fetch = originalFetch }
 })
