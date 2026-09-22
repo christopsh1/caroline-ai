@@ -18,10 +18,10 @@ export default {
     const url = new URL(req.url)
     try {
       if (url.pathname === '/health' && req.method === 'GET') {
-        return json({ ok: true, service: 'caroline_phone', release: '3.8.0' }, 200, requestId)
+        return json({ ok: true, service: 'caroline_phone', release: '3.9.0' }, 200, requestId)
       }
       if (url.pathname === '/status' && req.method === 'GET') {
-        if (!verifyRuntimeKey(req, env.CAROLINE_RUNTIME_KEY)) return json({ error: 'unauthorized' }, 401, requestId)
+        if (!verifyRuntimeKey(req, env.CAROLINE_KEY)) return json({ error: 'forbidden' }, 403, requestId)
         return handleStatus(env, requestId)
       }
       if (url.pathname === '/runtime/init') return await handleRuntimeInit(req, env, requestId)
