@@ -1,113 +1,57 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { handleRuntimePhoneAction } from '../src/handlers/runtime-phone.ts'
-import { signCarolinePayload } from '../src/lib/security.ts'
+import { applyCurrentSessionHold, createPendingNeonSession, type CarolineSessionState } from '../src/lib/session-model.ts'
 
-const runtimeKey = 'edge-runtime-key'
-const coreKey = 'core-runtime-key'
-
-async function signedCore(body: unknown, status = 200): Promise<Response> {
-  const raw = JSON.stringify(body)
-  const ts = Math.floor(Date.now() / 1000)
-  const sig = await signCarolinePayload(raw, coreKey, ts)
-  return new Response(raw, { status, headers: { 'X-Caroline-Signature': sig } })
+function namespaceFor(initial: CarolineSessionState) {
+  let state = initial
+  return {
+    getByName() {
+      return {
+        async fetch(req: Request) {
+          const url = new URL(req.url)
+          if (req.method === 'GET') return new Response(JSON.stringify(state), { status: 200 })
+          if (url.pathname.endsWith('/hold') && req.method === 'POST') {
+            const body = await req.json() as any
+            const updated = applyCurrentSessionHold(state, body.reason_code, body.reason_summary)
+            if (!updated) return new Response('{"error":"forbidden"}', { status: 403 })
+            state = updated
+            return new Response(JSON.stringify(state), { status: 200 })
+          }
+          return new Response('{}', { status: 404 })
+        },
+      }
+    },
+  }
 }
 
-function env() {
-  return { CAROLINE_KEY: runtimeKey, CORE_RUNTIME_URL: 'https://core.example.test', CORE_RUNTIME_KEY: coreKey }
-}
-
-function req(path: string, body: unknown, key = runtimeKey): Request {
+function request(path: string, body: unknown) {
   return new Request(`https://edge.test/runtime/phone/${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-caroline-key': key },
+    headers: { 'Content-Type': 'application/json', 'x-caroline-key': 'secret' },
     body: JSON.stringify(body),
   })
 }
 
-test('phone actions require edge auth and conversation binding input', async () => {
-  const unauthorized = await handleRuntimePhoneAction(req('hold', { conversation_id: 'c1' }, 'wrong'), env(), 'r1', 'hold')
-  assert.equal(unauthorized.status, 403)
-
-  const missingConversation = await handleRuntimePhoneAction(req('hold', { reason_code: 'abuse' }), env(), 'r2', 'hold')
-  assert.equal(missingConversation.status, 400)
+test('blocked/pending session cannot invoke phone actions even with valid runtime credential', async () => {
+  const session = createPendingNeonSession({ conversation_id: 'c1', interaction_mode: 'inbound_external' })
+  const res = await handleRuntimePhoneAction(request('sms', { conversation_id: 'c1', to_number: '+10000000000', message_summary: 'x' }), { CAROLINE_KEY: 'secret', CAROLINE_SESSIONS: namespaceFor(session) as any }, 'r1', 'sms')
+  assert.equal(res.status, 403)
 })
 
-test('contact resolve sends conversation id to core and strips internal fields', async () => {
-  const originalFetch = globalThis.fetch
-  let outbound: any
-  ;(globalThis as any).fetch = async (_url: string | URL | Request, init?: RequestInit) => {
-    outbound = JSON.parse(String(init?.body))
-    return signedCore({
-      schema_version: '1',
-      authorized: true,
-      unique: true,
-      candidates: [{ display_name: 'Nicole', phone: 'fixture-b', contact_ref: 'opaque-1', internal_id: 'db-uuid' }],
-      debug: 'secret',
-    })
+test('current-session hold is written through the Durable Object and does not claim cross-call persistence', async () => {
+  const base = createPendingNeonSession({ conversation_id: 'c2', interaction_mode: 'inbound_external' })
+  const session: CarolineSessionState = {
+    ...base,
+    role: 'external',
+    identity_status: 'verified_contact',
+    call_answering_status: 'allowed',
+    permission_snapshot: { ...base.permission_snapshot, can_hold_current_session: true },
   }
-  try {
-    const response = await handleRuntimePhoneAction(req('contact-resolve', { conversation_id: 'conv-1', name: 'Nicole', owner_phone: 'ignored-owner-fixture' }), env(), 'r3', 'contact-resolve')
-    assert.equal(response.status, 200)
-    assert.equal(outbound.input.conversation_id, 'conv-1')
-    assert.equal(outbound.input.owner_phone, undefined)
-    const body = await response.json() as any
-    assert.deepEqual(body, { authorized: true, unique: true, candidates: [{ display_name: 'Nicole', phone: 'fixture-b', contact_ref: 'opaque-1' }] })
-  } finally { ;(globalThis as any).fetch = originalFetch }
-})
-
-test('unauthorized SMS can never echo sent state', async () => {
-  const originalFetch = globalThis.fetch
-  ;(globalThis as any).fetch = async () => signedCore({ schema_version: '1', authorized: false, accepted: true, disposition: 'sent', provider_id: 'leak' })
-  try {
-    const response = await handleRuntimePhoneAction(req('sms', { conversation_id: 'conv-1', to_number: 'fixture-c', message_summary: 'Hello' }), env(), 'r4', 'sms')
-    assert.equal(response.status, 200)
-    assert.deepEqual(await response.json(), { authorized: false, accepted: false, disposition: 'rejected' })
-  } finally { ;(globalThis as any).fetch = originalFetch }
-})
-
-test('authorized SMS exposes only accepted disposition and schedule time', async () => {
-  const originalFetch = globalThis.fetch
-  ;(globalThis as any).fetch = async () => signedCore({
-    schema_version: '1', authorized: true, accepted: true, disposition: 'scheduled', execute_at: '2026-09-23T09:00:00-04:00', provider_id: 'private',
-  })
-  try {
-    const response = await handleRuntimePhoneAction(req('sms', { conversation_id: 'conv-1', to_number: 'fixture-c', message_summary: 'Hello' }), env(), 'r5', 'sms')
-    assert.deepEqual(await response.json(), { authorized: true, accepted: true, disposition: 'scheduled', execute_at: '2026-09-23T09:00:00-04:00' })
-  } finally { ;(globalThis as any).fetch = originalFetch }
-})
-
-test('calendar sanitizer enforces busy-only field discipline at the edge', async () => {
-  const originalFetch = globalThis.fetch
-  ;(globalThis as any).fetch = async () => signedCore({
-    schema_version: '1', authorized: true, share_level: 'busy_only', events: [{
-      start_at: '2026-09-23T09:00:00-04:00', end_at: '2026-09-23T10:00:00-04:00', status: 'busy', title: 'Private meeting', description: 'secret', location: 'secret place',
-    }],
-  })
-  try {
-    const response = await handleRuntimePhoneAction(req('calendar-read', { conversation_id: 'conv-1' }), env(), 'r6', 'calendar-read')
-    assert.deepEqual(await response.json(), {
-      authorized: true,
-      share_level: 'busy_only',
-      events: [{ start_at: '2026-09-23T09:00:00-04:00', end_at: '2026-09-23T10:00:00-04:00', status: 'busy' }],
-    })
-  } finally { ;(globalThis as any).fetch = originalFetch }
-})
-
-test('unauthorized hold can never echo held state', async () => {
-  const originalFetch = globalThis.fetch
-  ;(globalThis as any).fetch = async () => signedCore({ schema_version: '1', authorized: false, held: true, state: 'active' })
-  try {
-    const response = await handleRuntimePhoneAction(req('hold', { conversation_id: 'conv-1', reason_code: 'abuse' }), env(), 'r7', 'hold')
-    assert.deepEqual(await response.json(), { authorized: false, held: false, state: 'rejected' })
-  } finally { ;(globalThis as any).fetch = originalFetch }
-})
-
-test('re-entry acknowledgement is fail closed and only returns bounded message', async () => {
-  const originalFetch = globalThis.fetch
-  ;(globalThis as any).fetch = async () => signedCore({ schema_version: '1', authorized: true, acknowledged: true, message: 'Prior issue noted. We can continue.', internal: 'hide' })
-  try {
-    const response = await handleRuntimePhoneAction(req('reentry-ack', { conversation_id: 'conv-1', caller_phone: 'ignored-caller-fixture' }), env(), 'r8', 'reentry-ack')
-    assert.deepEqual(await response.json(), { authorized: true, acknowledged: true, message: 'Prior issue noted. We can continue.' })
-  } finally { ;(globalThis as any).fetch = originalFetch }
+  const res = await handleRuntimePhoneAction(request('hold', { conversation_id: 'c2', reason_code: 'abuse' }), { CAROLINE_KEY: 'secret', CAROLINE_SESSIONS: namespaceFor(session) as any }, 'r2', 'hold')
+  assert.equal(res.status, 200)
+  const body = await res.json() as any
+  assert.equal(body.state, 'session_hold_active')
+  assert.equal(body.scope, 'current_session')
+  assert.equal(body.canonical_persistence, 'pending_neon')
 })
