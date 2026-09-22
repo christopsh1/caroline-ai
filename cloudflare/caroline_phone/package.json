@@ -1,6 +1,6 @@
 {
   "name": "caroline-phone-edge",
-  "version": "3.6.0",
+  "version": "3.7.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,8 @@
     "secrets:list:dev": "wrangler secret list --env dev",
     "secrets:list:prod": "wrangler secret list --env production",
     "smoke": "node scripts/smoke.mjs",
-    "smoke:elevenlabs": "node scripts/synthetic-elevenlabs.mjs"
+    "smoke:elevenlabs": "node scripts/synthetic-elevenlabs.mjs",
+    "smoke:integration": "node scripts/integration-smoke.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260919.0",
