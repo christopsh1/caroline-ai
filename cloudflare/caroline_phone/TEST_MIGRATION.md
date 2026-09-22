@@ -19,7 +19,7 @@ Tests whose success depends on `__caroline_regression_probe`, Supabase Edge Func
 The old Nikki/Nicole simulation expects a verified personal-contact register but does not inject authoritative verified identity/tier/persona context. It must be replaced with a fixture that explicitly supplies the verified runtime context. Unknown callers must never receive friend-level familiarity merely to satisfy a stale test.
 
 ### Restricted-caller model-only fixture
-The old restricted-caller simulation starts with the normal agent greeting and relies on the model to notice a variable later. v3.6 moves the primary control to `/runtime/init`: blocked states receive an edge-owned first message and zero custom tools before normal conversation begins. Keep a prompt-level check only as defense in depth.
+The old restricted-caller simulation starts with the normal agent greeting and relies on the model to notice a variable later. v3.7 moves the primary control to `/runtime/init`: blocked states receive an edge-owned first message and zero custom tools before normal conversation begins. Keep a prompt-level check only as defense in depth.
 
 ## Deferred until dev deployment
 
@@ -37,3 +37,5 @@ No legacy test is allowed to force a weaker identity, privacy, or authorization 
 ## Replacement personal-register fixture
 
 The clean ElevenLabs test `CLOUDFLARE REFACTOR — Verified personal register` (`test_3401m350e50gfz1tb2qgp67j85m1`) passes on the non-live `cloudflare-refactor` branch. It supplies authoritative verified-personal runtime context and does not pre-start unrelated procedures. Use it in the curated refactor suite instead of the stale personal-register fixture.
+
+- v3.7 adds conversation-bound retrieval: `/runtime/retrieve` rejects any request without `conversation_id`; ElevenLabs retrieval tools must source it from `system__conversation_id`.
