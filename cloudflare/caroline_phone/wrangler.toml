@@ -7,20 +7,27 @@ compatibility_flags = ["nodejs_compat"]
 [observability]
 enabled = true
 
+[exports.CarolineSession]
+type = "durable-object"
+storage = "sqlite"
+
 [env.dev]
 name = "caroline-phone-dev"
 
 [env.dev.vars]
 ENVIRONMENT = "development"
+PHONE_TOOL_POLICY_JSON = "{\"owner\":[],\"external\":[],\"unknown\":[],\"outbound\":[],\"hold\":[],\"calendar_read\":[],\"reentry\":[]}"
 
 [env.dev.secrets]
 required = [
   "CAROLINE_KEY",
-  "CORE_RUNTIME_KEY",
   "ELEVENLABS_WEBHOOK_SECRET",
   "TWILIO_AUTH_TOKEN",
-  "EVENT_SINK_KEY",
 ]
+
+[[env.dev.durable_objects.bindings]]
+name = "CAROLINE_SESSIONS"
+class_name = "CarolineSession"
 
 [[env.dev.kv_namespaces]]
 binding = "Caroline_Phone"
@@ -47,15 +54,18 @@ name = "caroline-phone"
 
 [env.production.vars]
 ENVIRONMENT = "production"
+PHONE_TOOL_POLICY_JSON = "{\"owner\":[],\"external\":[],\"unknown\":[],\"outbound\":[],\"hold\":[],\"calendar_read\":[],\"reentry\":[]}"
 
 [env.production.secrets]
 required = [
   "CAROLINE_KEY",
-  "CORE_RUNTIME_KEY",
   "ELEVENLABS_WEBHOOK_SECRET",
   "TWILIO_AUTH_TOKEN",
-  "EVENT_SINK_KEY",
 ]
+
+[[env.production.durable_objects.bindings]]
+name = "CAROLINE_SESSIONS"
+class_name = "CarolineSession"
 
 [[env.production.kv_namespaces]]
 binding = "Caroline_Phone"
