@@ -1,16 +1,14 @@
 export interface Env {
   ENVIRONMENT?: string
-  CAROLINE_RUNTIME_KEY?: string
+  CAROLINE_KEY?: string
   ELEVENLABS_WEBHOOK_SECRET?: string
   EVENT_SINK_URL?: string
   EVENT_SINK_KEY?: string
   CORE_RUNTIME_URL?: string
   CORE_RUNTIME_KEY?: string
   PHONE_TOOL_POLICY_JSON?: string
-  TWILIO_INGRESS_ENABLED?: string
   TWILIO_AUTH_TOKEN?: string
-  TWILIO_PUBLIC_BASE_URL?: string
-  CAROLINE_PHONE?: KVNamespace
+  Caroline_Phone?: KVNamespace
   CAROLINE_PAYLOADS?: R2Bucket
   CAROLINE_EVENTS?: Queue<QueuedEventPointer>
 }
