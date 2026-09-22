@@ -29,7 +29,8 @@ export function handleStatus(env: Env, requestId: string): Response {
       elevenlabs_webhook_secret: Boolean(env.ELEVENLABS_WEBHOOK_SECRET),
       caroline_phone_kv: Boolean(env.Caroline_Phone),
       payload_r2: Boolean(env.CAROLINE_PAYLOADS),
-      events_queue: Boolean(env.CAROLINE_EVENTS),
+      event_delivery_queue: Boolean(env.CAROLINE_EVENT_QUEUE),
+      event_dlq_binding: Boolean(env.CAROLINE_EVENT_DLQ),
       twilio_auth_token: Boolean(env.TWILIO_AUTH_TOKEN),
     },
     pending_integrations: {
