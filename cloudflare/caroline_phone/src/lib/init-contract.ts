@@ -103,6 +103,17 @@ function safeFirstMessage(value: unknown): string | undefined {
   return trimmed
 }
 
+const BLOCKED_FIRST_MESSAGES: Record<string, string> = {
+  restricted: "This number hasn't been re-authorized for normal Caroline calls yet. Please reach Chris another way if needed. Take care.",
+  restricted_by_owner: "This number isn't authorized for normal Caroline calls. Please reach Chris another way if needed. Take care.",
+  banned: "This number isn't authorized for normal Caroline calls. Please reach Chris another way if needed. Take care.",
+  waitlisted: "This number isn't authorized for normal Caroline calls yet. Please reach Chris another way if needed. Take care.",
+}
+
+export function blockedFirstMessage(status: string): string | undefined {
+  return BLOCKED_FIRST_MESSAGES[status]
+}
+
 function isOutbound(context: InitRequestContext | undefined): boolean {
   if (!context) return false
   return context.outbound_call === true || context.interaction_mode === 'outbound'
@@ -144,7 +155,11 @@ export function buildElevenLabsInitResponse(
   const dynamicVariables = normalizeDynamicVariables(coreBody.dynamic_variables)
   const policy = parseToolPolicy(env.PHONE_TOOL_POLICY_JSON)
   const toolIds = selectPhoneToolIds(dynamicVariables, policy, context)
-  const firstMessage = safeFirstMessage(coreBody.first_message)
+  // Admission is an edge-owned security decision. A blocked call never accepts
+  // backend-provided caller-facing copy; the fixed edge message avoids leaking
+  // internal restriction reasons or making unsupported notification claims.
+  const firstMessage = blockedFirstMessage(dynamicVariables.call_answering_status)
+    ?? safeFirstMessage(coreBody.first_message)
 
   const response: Record<string, unknown> = {
     type: 'conversation_initiation_client_data',
