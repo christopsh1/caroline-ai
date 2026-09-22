@@ -2,15 +2,12 @@ export interface Env {
   ENVIRONMENT?: string
   CAROLINE_KEY?: string
   ELEVENLABS_WEBHOOK_SECRET?: string
-  EVENT_SINK_URL?: string
-  EVENT_SINK_KEY?: string
-  CORE_RUNTIME_URL?: string
-  CORE_RUNTIME_KEY?: string
   PHONE_TOOL_POLICY_JSON?: string
   TWILIO_AUTH_TOKEN?: string
   Caroline_Phone?: KVNamespace
   CAROLINE_PAYLOADS?: R2Bucket
   CAROLINE_EVENTS?: Queue<QueuedEventPointer>
+  CAROLINE_SESSIONS?: DurableObjectNamespace
 }
 
 export type EventSource = 'elevenlabs'
