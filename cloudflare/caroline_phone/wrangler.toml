@@ -54,18 +54,18 @@ bucket_name = "caroline-phone-payloads-dev"
 
 [[env.dev.queues.producers]]
 binding = "CAROLINE_EVENT_QUEUE"
-queue = "caroline-event-delivery"
+queue = "caroline-phone-events-dev"
 
 [[env.dev.queues.producers]]
 binding = "CAROLINE_EVENT_DLQ"
-queue = "caroline-event-dlq"
+queue = "caroline-phone-events-dev-dlq"
 
 [[env.dev.queues.consumers]]
-queue = "caroline-event-delivery"
+queue = "caroline-phone-events-dev"
 max_batch_size = 10
 max_batch_timeout = 5
 max_retries = 3
-dead_letter_queue = "caroline-event-dlq"
+dead_letter_queue = "caroline-phone-events-dev-dlq"
 
 [env.production]
 name = "caroline-phone"
