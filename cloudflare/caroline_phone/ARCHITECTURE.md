@@ -1,4 +1,4 @@
-# Caroline Phone Edge Architecture — v3.4
+# Caroline Phone Edge Architecture — v3.7
 
 ## Role
 `caroline-phone` is Caroline's provider security, runtime-facade, and transport boundary. It is not the memory store, business database, owner UI, or conversational brain.
@@ -25,8 +25,7 @@ The core does **not** get arbitrary control of ElevenLabs configuration. Cloudfl
 The core cannot inject a replacement prompt, LLM, arbitrary tool IDs, credentials, or internal fields through the init response.
 
 ### Retrieval trust boundary
-`/runtime/retrieve` validates bounded request fields and the allowed interaction modes (`inbound_owner`, `inbound_external`, `outbound`). The core remains responsible for identity/scope authorization. The edge returns only a small sanitized envelope: `authorized`, `context`, and bounded text results. Internal IDs/debug fields are discarded.
-
+`/runtime/retrieve` requires `conversation_id` plus bounded request fields and the allowed interaction modes (`inbound_owner`, `inbound_external`, `outbound`). The conversation ID must be supplied from ElevenLabs' trusted `system__conversation_id`; the core authorizes the retrieval against conversation-bound server state and never trusts caller phone alone. The edge returns only a small sanitized envelope: `authorized`, `context`, and bounded text results. Internal IDs/debug fields are discarded.
 
 ## Phone tool capability policy
 The init facade selects tools from deployment-time capability buckets rather than trusting core-supplied IDs. Restricted/waitlisted/banned calls receive no custom tools. Admitted inbound calls receive only their verified role bucket plus narrowly conditional hold/calendar/re-entry capabilities. Outbound calls use a separate outbound bucket. Missing or malformed policy fails closed to an empty tool surface.
@@ -61,3 +60,26 @@ The Queue consumer reads R2, verifies SHA-256 against the queued pointer, valida
 - edge↔core requests and successful responses are mutually HMAC authenticated;
 - tool exposure is edge policy, not backend suggestion;
 - Twilio remains fail-closed until exact public callback validation is implemented.
+
+## Stable phone-action facade
+
+Version 3.5 replaces transient per-call action tool documents with stable edge endpoints. ElevenLabs tool IDs become deploy-time bindings in `PHONE_TOOL_POLICY_JSON`; capability selection remains driven by verified init context.
+
+Action flow:
+
+1. ElevenLabs calls a stable `/runtime/phone/*` endpoint using the edge runtime secret.
+2. The edge validates a narrow per-action schema and requires `conversation_id`.
+3. The edge signs the normalized request to the core.
+4. The core resolves the authoritative conversation and derives identity/permissions server-side. It must never authorize based on a model-supplied phone number.
+5. The core returns a signed response.
+6. The edge verifies the signature, strips internal fields, reapplies privacy ceilings, and emits a bounded response.
+
+There is no general-purpose `/proxy` route.
+
+### Defense-in-depth response rules
+
+- Unauthorized SMS always becomes `accepted=false, disposition=rejected`, even if an upstream payload claims `sent`.
+- Unauthorized hold always becomes `held=false, state=rejected`.
+- Calendar results are field-stripped again at the edge: `busy_only` cannot leak title, description, or location; `title` cannot leak description/location.
+- Re-entry responses expose only a bounded acknowledgement message and only after the core confirms the pending one-time state.
+- Owner calls never receive the caller-hold tool, preventing accidental self-restriction.
