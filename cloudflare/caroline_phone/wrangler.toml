@@ -1,4 +1,4 @@
-name = "caroline_phone"
+name = "caroline-phone"
 main = "src/index.ts"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
@@ -6,35 +6,64 @@ compatibility_flags = ["nodejs_compat"]
 [observability]
 enabled = true
 
-# The same namespace may be bound in development and production because all
-# Worker-owned keys are environment-prefixed. The live namespace ID is inserted
-# only after it is read from the Cloudflare API bridge.
-#
-# [[kv_namespaces]]
-# binding = "CAROLINE_PHONE"
-# id = "<LIVE_CAROLINE_PHONE_KV_NAMESPACE_ID>"
+# Cloudflare bindings are non-inheritable across named environments.
+# Insert the confirmed live resource IDs/names into BOTH environment blocks.
+# `Caroline_Phone` KV may be shared because keys are environment-prefixed.
+# R2 and Queues should remain environment-separated.
 
 [env.dev]
-name = "caroline_phone-dev"
+name = "caroline-phone-dev"
 
 [env.dev.vars]
 ENVIRONMENT = "development"
 TWILIO_INGRESS_ENABLED = "false"
 
+# [[env.dev.kv_namespaces]]
+# binding = "CAROLINE_PHONE"
+# id = "<LIVE_CAROLINE_PHONE_KV_NAMESPACE_ID>"
+# [[env.dev.r2_buckets]]
+# binding = "CAROLINE_PAYLOADS"
+# bucket_name = "caroline-phone-payloads-dev"
+# [[env.dev.queues.producers]]
+# binding = "CAROLINE_EVENTS"
+# queue = "caroline-phone-events-dev"
+# [[env.dev.queues.consumers]]
+# queue = "caroline-phone-events-dev"
+# max_batch_size = 5
+# max_batch_timeout = 2
+# max_retries = 5
+# dead_letter_queue = "caroline-phone-events-dev-dlq"
+# retry_delay = 30
+
 [env.production]
-name = "caroline_phone"
+name = "caroline-phone"
 
 [env.production.vars]
 ENVIRONMENT = "production"
 TWILIO_INGRESS_ENABLED = "false"
 
-# Secrets are environment-specific and must never be committed:
+# [[env.production.kv_namespaces]]
+# binding = "CAROLINE_PHONE"
+# id = "<LIVE_CAROLINE_PHONE_KV_NAMESPACE_ID>"
+# [[env.production.r2_buckets]]
+# binding = "CAROLINE_PAYLOADS"
+# bucket_name = "caroline-phone-payloads"
+# [[env.production.queues.producers]]
+# binding = "CAROLINE_EVENTS"
+# queue = "caroline-phone-events"
+# [[env.production.queues.consumers]]
+# queue = "caroline-phone-events"
+# max_batch_size = 5
+# max_batch_timeout = 2
+# max_retries = 5
+# dead_letter_queue = "caroline-phone-events-dlq"
+# retry_delay = 30
+
+# Environment-specific secrets, never committed:
 #   CAROLINE_RUNTIME_KEY
 #   ELEVENLABS_WEBHOOK_SECRET
 #   EVENT_SINK_URL
 #   EVENT_SINK_KEY
-#
-# Reserved for the Twilio gate. Do not configure/enable until the exact public
-# callback URL is fixed and Twilio's supported request validator is wired:
+# Reserved for Twilio gate:
 #   TWILIO_AUTH_TOKEN
 #   TWILIO_PUBLIC_BASE_URL

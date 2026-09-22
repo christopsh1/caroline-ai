@@ -1,19 +1,15 @@
-# Deployment sequence
+# Deployment sequence — v3.2
 
-1. Read the live Cloudflare account inventory through the authenticated Cloudflare API bridge.
-2. Confirm there are no existing `caroline_phone` Worker deployments that would be overwritten.
-3. Read the namespace ID for the Cloudflare KV namespace named `Caroline_Phone`.
-4. Add that ID to `wrangler.toml` as binding `CAROLINE_PHONE`.
-5. Create a development Worker environment/deployment first (`caroline_phone-dev`).
-6. Add development Worker secrets without committing their values.
-7. Run `npm run check`, then verify `/health` and authenticated `/status` on the deployed development Worker.
-8. Verify ElevenLabs HMAC handling with synthetic signed fixtures before changing any live webhook URL.
-9. Select the replacement backend contract, then configure `EVENT_SINK_URL` and `EVENT_SINK_KEY` and verify the Caroline-signed event envelope end to end.
-10. Do not enable Twilio ingress until Twilio's supported request validator is wired against the exact Cloudflare callback URL. The current route must remain fail-closed.
-11. Run replay, malformed-payload, stale-signature, oversized-body, downstream-failure, and duplicate-delivery regression tests.
-12. Only after regression testing, change live provider endpoints one at a time with rollback values documented.
-13. Rotate the Cloudflare API token used during setup if it was ever passed as an action parameter.
-
-## Production cutover rule
-
-A development success does not authorize production cutover. `caroline_phone` production routing is changed only after the replacement event sink is selected, authenticated, idempotent by `event_id`, and regression-tested.
+1. Read live Cloudflare Workers, KV, R2, Queues and routes through the authenticated API bridge.
+2. Confirm no production `caroline-phone` Worker will be overwritten.
+3. Read the live `Caroline_Phone` KV namespace ID.
+4. Create/confirm `caroline-phone-payloads` R2, `caroline-phone-events` Queue, and `caroline-phone-events-dlq`.
+5. Bind KV/R2/Queue resources in the development environment first.
+6. Configure development secrets without committing values.
+7. Configure and verify the replacement event sink; it must enforce Caroline HMAC and idempotency by `event_id`.
+8. Run `npm run check`; deploy `caroline_phone-dev`.
+9. Verify `/health`, authenticated `/status`, signed synthetic ElevenLabs ingress, R2 staging, Queue consumption, retries, DLQ path, and cleanup.
+10. Point only the non-live ElevenLabs `cloudflare-refactor` branch at the development Worker and run regression tests.
+11. Implement Twilio request validation against the exact Cloudflare callback URL before enabling any Twilio edge route.
+12. Change production provider endpoints only after regression success, one route at a time, with rollback values documented.
+13. Rotate the Cloudflare setup API token if it was passed as an action parameter.

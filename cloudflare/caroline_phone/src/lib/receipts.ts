@@ -1,4 +1,4 @@
-import type { Env } from '../types'
+import type { Env } from '../types.ts'
 
 export interface ReceiptMetadata {
   source: string
@@ -22,7 +22,5 @@ export async function likelyAlreadyDelivered(env: Env, eventId: string): Promise
 
 export async function recordReceipt(env: Env, metadata: ReceiptMetadata): Promise<void> {
   if (!env.CAROLINE_PHONE) return
-  await env.CAROLINE_PHONE.put(receiptKey(env, metadata.event_id), JSON.stringify(metadata), {
-    expirationTtl: 60 * 60 * 24 * 7,
-  })
+  await env.CAROLINE_PHONE.put(receiptKey(env, metadata.event_id), JSON.stringify(metadata), { expirationTtl: 60 * 60 * 24 * 7 })
 }

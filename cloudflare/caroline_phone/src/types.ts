@@ -8,6 +8,8 @@ export interface Env {
   TWILIO_AUTH_TOKEN?: string
   TWILIO_PUBLIC_BASE_URL?: string
   CAROLINE_PHONE?: KVNamespace
+  CAROLINE_PAYLOADS?: R2Bucket
+  CAROLINE_EVENTS?: Queue<QueuedEventPointer>
 }
 
 export type EventSource = 'elevenlabs'
@@ -23,4 +25,16 @@ export interface CarolineEventEnvelope<T = unknown> {
   received_at: string
   payload_sha256: string
   payload: T
+}
+
+export interface QueuedEventPointer {
+  schema_version: '1'
+  event_id: string
+  request_id: string
+  environment: string
+  source: EventSource
+  source_event_type: string
+  received_at: string
+  object_key: string
+  envelope_sha256: string
 }
