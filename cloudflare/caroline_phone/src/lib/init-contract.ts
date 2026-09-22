@@ -18,9 +18,10 @@ const SAFE_DEFAULTS = {
   outbound_call_brief_json: '{}',
   caller_persona_profile_json: 'null',
   session_energy: 'neutral',
-  call_answering_status: 'allowed',
+  call_answering_status: 'canonical_pending',
   call_answering_reason: '',
   call_reentry_notice_pending: 'false',
+  outbound_authorization_status: 'not_authorized',
   bio_short: '',
   extended_bio: '',
   caroline_persona_facts: '',
@@ -45,7 +46,7 @@ interface ToolPolicy {
   reentry: string[]
 }
 
-export interface CoreInitResponse {
+export interface RuntimeInitSource {
   schema_version?: unknown
   dynamic_variables?: unknown
   first_message?: unknown
@@ -87,7 +88,7 @@ function parseToolPolicy(raw: string | undefined): ToolPolicy {
     if (!isPlainObject(value)) return empty
     for (const bucket of ['owner', 'external', 'unknown', 'outbound', 'hold', 'calendar_read', 'reentry'] as const) {
       const parsed = parseToolList(value[bucket])
-      if (parsed === null) return empty
+      if (parsed === null) return emptyToolPolicy()
       empty[bucket] = parsed
     }
     return empty
@@ -104,6 +105,7 @@ function safeFirstMessage(value: unknown): string | undefined {
 }
 
 const BLOCKED_FIRST_MESSAGES: Record<string, string> = {
+  canonical_pending: "Caroline isn't available to handle this call right now. Please reach Chris another way if needed. Take care.",
   restricted: "This number hasn't been re-authorized for normal Caroline calls yet. Please reach Chris another way if needed. Take care.",
   restricted_by_owner: "This number isn't authorized for normal Caroline calls. Please reach Chris another way if needed. Take care.",
   banned: "This number isn't authorized for normal Caroline calls. Please reach Chris another way if needed. Take care.",
@@ -124,42 +126,45 @@ export function selectPhoneToolIds(
   policy: ToolPolicy,
   context?: InitRequestContext,
 ): string[] {
-  // Restricted/waitlisted/banned calls should never receive custom action tools.
   if (vars.call_answering_status !== 'allowed') return []
 
-  if (isOutbound(context)) return [...new Set(policy.outbound)].slice(0, 64)
-
   const role = roleFromVariables(vars)
+
+  if (isOutbound(context)) {
+    if (vars.outbound_authorization_status !== 'owner_authorized') return []
+    return [...new Set(policy.outbound)].slice(0, 64)
+  }
+
+  // Unverified callers never receive custom tools from deployment config.
+  if (role === 'unknown') return []
+
   const selected = [...policy[role]]
-
-  // Caller hold is never exposed to the verified owner, preventing accidental self-restriction.
-  if (role !== 'owner') selected.push(...policy.hold)
-
-  // Calendar reads are possible only when runtime context explicitly grants a share level.
+  if (role === 'external') selected.push(...policy.hold)
   if (vars.calendar_share_level !== 'none') selected.push(...policy.calendar_read)
-
-  // Re-entry acknowledgement exists only for the one call carrying a pending notice.
-  if (vars.call_reentry_notice_pending === 'true') selected.push(...policy.reentry)
+  if (role === 'external' && vars.call_reentry_notice_pending === 'true') selected.push(...policy.reentry)
 
   return [...new Set(selected)].slice(0, 64)
 }
 
+export function toolIdsForInit(
+  env: Env,
+  vars: Record<CarolineDynamicVariableName, string>,
+  context?: InitRequestContext,
+): string[] {
+  return selectPhoneToolIds(vars, parseToolPolicy(env.PHONE_TOOL_POLICY_JSON), context)
+}
+
 export function buildElevenLabsInitResponse(
-  coreBody: unknown,
+  sourceBody: unknown,
   env: Env,
   context?: InitRequestContext,
 ): Record<string, unknown> | null {
-  if (!isPlainObject(coreBody)) return null
-  if (coreBody.schema_version !== '1') return null
+  if (!isPlainObject(sourceBody) || sourceBody.schema_version !== '1') return null
 
-  const dynamicVariables = normalizeDynamicVariables(coreBody.dynamic_variables)
-  const policy = parseToolPolicy(env.PHONE_TOOL_POLICY_JSON)
-  const toolIds = selectPhoneToolIds(dynamicVariables, policy, context)
-  // Admission is an edge-owned security decision. A blocked call never accepts
-  // backend-provided caller-facing copy; the fixed edge message avoids leaking
-  // internal restriction reasons or making unsupported notification claims.
+  const dynamicVariables = normalizeDynamicVariables(sourceBody.dynamic_variables)
+  const toolIds = toolIdsForInit(env, dynamicVariables, context)
   const firstMessage = blockedFirstMessage(dynamicVariables.call_answering_status)
-    ?? safeFirstMessage(coreBody.first_message)
+    ?? safeFirstMessage(sourceBody.first_message)
 
   const response: Record<string, unknown> = {
     type: 'conversation_initiation_client_data',
