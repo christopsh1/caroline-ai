@@ -6,12 +6,12 @@ export type StageResult =
   | { ok: false; reason: 'payload_store_not_configured' | 'queue_not_configured' | 'payload_store_failed' | 'queue_send_failed' }
 
 export function asyncPipelineReady(env: Env): boolean {
-  return Boolean(env.CAROLINE_PAYLOADS && env.CAROLINE_EVENTS)
+  return Boolean(env.CAROLINE_PAYLOADS && env.CAROLINE_EVENT_QUEUE)
 }
 
 export async function stageAndQueueEvent(env: Env, envelope: CarolineEventEnvelope): Promise<StageResult> {
   if (!env.CAROLINE_PAYLOADS) return { ok: false, reason: 'payload_store_not_configured' }
-  if (!env.CAROLINE_EVENTS) return { ok: false, reason: 'queue_not_configured' }
+  if (!env.CAROLINE_EVENT_QUEUE) return { ok: false, reason: 'queue_not_configured' }
 
   const body = JSON.stringify(envelope)
   const envelopeHash = await sha256Hex(body)
@@ -46,7 +46,7 @@ export async function stageAndQueueEvent(env: Env, envelope: CarolineEventEnvelo
   }
 
   try {
-    await env.CAROLINE_EVENTS.send(pointer)
+    await env.CAROLINE_EVENT_QUEUE.send(pointer)
   } catch {
     try { await env.CAROLINE_PAYLOADS.delete(objectKey) } catch { /* cleanup best effort */ }
     return { ok: false, reason: 'queue_send_failed' }
