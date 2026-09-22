@@ -15,6 +15,10 @@ storage = "sqlite"
 binding = "CAROLINE_EVENT_QUEUE"
 queue = "caroline-event-delivery"
 
+[[queues.producers]]
+binding = "CAROLINE_EVENT_DLQ"
+queue = "caroline-event-dlq"
+
 [[queues.consumers]]
 queue = "caroline-event-delivery"
 max_batch_size = 10
@@ -49,16 +53,19 @@ binding = "CAROLINE_PAYLOADS"
 bucket_name = "caroline-phone-payloads-dev"
 
 [[env.dev.queues.producers]]
-binding = "CAROLINE_EVENTS"
-queue = "caroline-phone-events-dev"
+binding = "CAROLINE_EVENT_QUEUE"
+queue = "caroline-event-delivery"
+
+[[env.dev.queues.producers]]
+binding = "CAROLINE_EVENT_DLQ"
+queue = "caroline-event-dlq"
 
 [[env.dev.queues.consumers]]
-queue = "caroline-phone-events-dev"
-max_batch_size = 5
-max_batch_timeout = 2
-max_retries = 5
-dead_letter_queue = "caroline-phone-events-dev-dlq"
-retry_delay = 30
+queue = "caroline-event-delivery"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "caroline-event-dlq"
 
 [env.production]
 name = "caroline-phone"
@@ -87,13 +94,16 @@ binding = "CAROLINE_PAYLOADS"
 bucket_name = "caroline-phone-payloads"
 
 [[env.production.queues.producers]]
-binding = "CAROLINE_EVENTS"
-queue = "caroline-phone-events"
+binding = "CAROLINE_EVENT_QUEUE"
+queue = "caroline-event-delivery"
+
+[[env.production.queues.producers]]
+binding = "CAROLINE_EVENT_DLQ"
+queue = "caroline-event-dlq"
 
 [[env.production.queues.consumers]]
-queue = "caroline-phone-events"
-max_batch_size = 5
-max_batch_timeout = 2
-max_retries = 5
-dead_letter_queue = "caroline-phone-events-dlq"
-retry_delay = 30
+queue = "caroline-event-delivery"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "caroline-event-dlq"
