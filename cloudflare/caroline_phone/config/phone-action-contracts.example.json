@@ -19,7 +19,7 @@
       "policy_bucket": "owner"
     },
     {
-      "name": "get_caroline_calendar_phone",
+      "name": "query_caroline_shared_schedule",
       "method": "POST",
       "path": "/runtime/phone/calendar-read",
       "required_body": ["conversation_id"],
@@ -27,7 +27,7 @@
       "policy_bucket": "calendar_read"
     },
     {
-      "name": "place_caller_on_hold_phone",
+      "name": "set_current_caller_on_hold",
       "method": "POST",
       "path": "/runtime/phone/hold",
       "required_body": ["conversation_id"],
@@ -35,7 +35,7 @@
       "policy_bucket": "hold"
     },
     {
-      "name": "acknowledge_caller_reentry_phone",
+      "name": "record_reentry_acknowledgement",
       "method": "POST",
       "path": "/runtime/phone/reentry-ack",
       "required_body": ["conversation_id"],
