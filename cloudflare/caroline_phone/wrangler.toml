@@ -64,7 +64,7 @@ TWILIO_INGRESS_ENABLED = "false"
 #   ELEVENLABS_WEBHOOK_SECRET
 #   EVENT_SINK_URL
 #   EVENT_SINK_KEY
-# Reserved for Twilio gate:
+# Twilio validation gate (routing remains disabled):
 #   TWILIO_AUTH_TOKEN
 #   TWILIO_PUBLIC_BASE_URL
 
