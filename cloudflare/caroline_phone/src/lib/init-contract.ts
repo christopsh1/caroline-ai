@@ -121,8 +121,8 @@ export function selectPhoneToolIds(
   const role = roleFromVariables(vars)
   const selected = [...policy[role]]
 
-  // The hold action is available only on an admitted live inbound conversation.
-  selected.push(...policy.hold)
+  // Caller hold is never exposed to the verified owner, preventing accidental self-restriction.
+  if (role !== 'owner') selected.push(...policy.hold)
 
   // Calendar reads are possible only when runtime context explicitly grants a share level.
   if (vars.calendar_share_level !== 'none') selected.push(...policy.calendar_read)
