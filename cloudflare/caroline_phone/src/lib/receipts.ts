@@ -12,15 +12,12 @@ export interface ReceiptMetadata {
 }
 
 function receiptKey(env: Env, eventId: string): string {
-  return `receipt:${env.ENVIRONMENT ?? 'unknown'}:${eventId}`
+  return `receipt-cache:${env.ENVIRONMENT ?? 'unknown'}:${eventId}`
 }
 
-export async function likelyAlreadyDelivered(env: Env, eventId: string): Promise<boolean> {
-  if (!env.Caroline_Phone) return false
-  return (await env.Caroline_Phone.get(receiptKey(env, eventId))) !== null
-}
-
-export async function recordReceipt(env: Env, metadata: ReceiptMetadata): Promise<void> {
+// KV is only a diagnostic/cache copy. It must never decide whether an event is
+// accepted, authorized, retried, or treated as exactly-once.
+export async function recordReceiptCache(env: Env, metadata: ReceiptMetadata): Promise<void> {
   if (!env.Caroline_Phone) return
   await env.Caroline_Phone.put(receiptKey(env, metadata.event_id), JSON.stringify(metadata), { expirationTtl: 60 * 60 * 24 * 7 })
 }
