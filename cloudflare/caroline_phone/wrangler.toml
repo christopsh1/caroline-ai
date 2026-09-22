@@ -11,6 +11,17 @@ enabled = true
 type = "durable-object"
 storage = "sqlite"
 
+[[queues.producers]]
+binding = "CAROLINE_EVENT_QUEUE"
+queue = "caroline-event-delivery"
+
+[[queues.consumers]]
+queue = "caroline-event-delivery"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "caroline-event-dlq"
+
 [env.dev]
 name = "caroline-phone-dev"
 
