@@ -1,15 +1,14 @@
 import type { Env } from '../types.ts'
-import { callCoreRuntime } from '../lib/core-runtime.ts'
+import { getCanonicalRagContext } from '../lib/canonical.ts'
 import { json } from '../lib/http.ts'
-import { log } from '../lib/log.ts'
 import { RequestBodyTooLargeError, readBodyWithLimit } from '../lib/request.ts'
-import { verifyRuntimeKey } from '../lib/security.ts'
+import { sha256Hex, verifyRuntimeKey } from '../lib/security.ts'
+import { loadSession } from '../lib/session-store.ts'
 
 const RETRIEVE_REQUEST_MAX_BYTES = 32 * 1024
-const RETRIEVE_RESPONSE_MAX_BYTES = 96 * 1024
 const MODES = new Set(['inbound_owner', 'inbound_external', 'outbound'])
 
-interface RetrievalInput {
+interface RetrievalInput extends Record<string, unknown> {
   conversation_id: string
   caller_phone: string
   interaction_mode: 'inbound_owner' | 'inbound_external' | 'outbound'
@@ -32,36 +31,7 @@ function parseInput(value: unknown): RetrievalInput | null {
   if (!validText(body.current_query, 4000)) return null
   if (!validText(body.recent_turns, 12000, false)) return null
   if (!validText(body.session_summary, 6000, false)) return null
-  return {
-    conversation_id: body.conversation_id as string,
-    caller_phone: body.caller_phone as string,
-    interaction_mode: body.interaction_mode as RetrievalInput['interaction_mode'],
-    current_query: body.current_query as string,
-    ...(typeof body.recent_turns === 'string' ? { recent_turns: body.recent_turns } : {}),
-    ...(typeof body.session_summary === 'string' ? { session_summary: body.session_summary } : {}),
-  }
-}
-
-function sanitizeCoreResult(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-  const body = value as Record<string, unknown>
-  if (body.schema_version !== '1' || typeof body.authorized !== 'boolean') return null
-  if (!body.authorized) return { authorized: false, context: '', results: [] }
-
-  const context = typeof body.context === 'string' ? body.context.slice(0, 32000) : ''
-  const rawResults = Array.isArray(body.results) ? body.results : []
-  const results = rawResults.slice(0, 10).flatMap((item) => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) return []
-    const row = item as Record<string, unknown>
-    if (typeof row.text !== 'string' || !row.text.trim()) return []
-    return [{
-      text: row.text.slice(0, 6000),
-      ...(typeof row.type === 'string' ? { type: row.type.slice(0, 80) } : {}),
-      ...(typeof row.timestamp === 'string' ? { timestamp: row.timestamp.slice(0, 64) } : {}),
-    }]
-  })
-  const response = { authorized: true, context, results }
-  return new TextEncoder().encode(JSON.stringify(response)).byteLength <= RETRIEVE_RESPONSE_MAX_BYTES ? response : null
+  return body as RetrievalInput
 }
 
 export async function handleRuntimeRetrieve(req: Request, env: Env, requestId: string): Promise<Response> {
@@ -82,13 +52,17 @@ export async function handleRuntimeRetrieve(req: Request, env: Env, requestId: s
   const input = parseInput(rawInput)
   if (!input) return json({ error: 'invalid_retrieval_request' }, 400, requestId)
 
-  const core = await callCoreRuntime(env, 'retrieve', input, requestId, RETRIEVE_RESPONSE_MAX_BYTES)
-  if (!core.ok) {
-    log('warn', 'runtime_retrieve_core_failed', { request_id: requestId, reason: core.reason, upstream_status: core.status ?? null })
-    return json({ error: 'upstream_unavailable' }, core.reason === 'core_rejected' || core.reason === 'core_unreachable' ? 502 : 503, requestId)
+  const session = await loadSession(env, input.conversation_id)
+  if (session === 'not_configured') return json({ error: 'session_store_unavailable' }, 503, requestId)
+  if (!session) return json({ error: 'session_not_initialized' }, 409, requestId)
+  if (session.caller_binding_hash && await sha256Hex(input.caller_phone.trim()) !== session.caller_binding_hash) {
+    return json({ error: 'forbidden' }, 403, requestId)
+  }
+  if (session.call_answering_status !== 'allowed' || !session.permission_snapshot.can_retrieve) {
+    return json({ error: 'forbidden' }, 403, requestId)
   }
 
-  const response = sanitizeCoreResult(core.body)
-  if (!response) return json({ error: 'invalid_core_retrieval_response' }, 502, requestId)
-  return json(response, 200, requestId)
+  const result = await getCanonicalRagContext(env, input)
+  if (result.status !== 'ready') return json({ error: 'canonical_context_pending' }, 503, requestId)
+  return json({ authorized: true, context: result.value.context, results: result.value.results.slice(0, 10) }, 200, requestId)
 }
