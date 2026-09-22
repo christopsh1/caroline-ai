@@ -1,4 +1,4 @@
-# Caroline Phone Edge Architecture — v3.7
+# Caroline Phone Edge Architecture — v3.8
 
 ## Role
 `caroline-phone` is Caroline's provider security, runtime-facade, and transport boundary. It is not the memory store, business database, owner UI, or conversational brain.
@@ -59,7 +59,7 @@ The Queue consumer reads R2, verifies SHA-256 against the queued pointer, valida
 - provider auth before JSON trust;
 - edge↔core requests and successful responses are mutually HMAC authenticated;
 - tool exposure is edge policy, not backend suggestion;
-- Twilio remains fail-closed until exact public callback validation is implemented.
+- Twilio signature validation is implemented, but routing remains fail-closed until the downstream call/SMS route is explicitly designed and tested.
 
 ## Stable phone-action facade
 
@@ -83,3 +83,6 @@ There is no general-purpose `/proxy` route.
 - Calendar results are field-stripped again at the edge: `busy_only` cannot leak title, description, or location; `title` cannot leak description/location.
 - Re-entry responses expose only a bounded acknowledgement message and only after the core confirms the pending one-time state.
 - Owner calls never receive the caller-hold tool, preventing accidental self-restriction.
+
+## Twilio validation boundary
+Twilio requests are validated against the configured exact HTTPS public origin plus the raw incoming path/query. Form-urlencoded requests are verified using Twilio's HMAC-SHA1 parameter algorithm; JSON requests additionally verify `bodySHA256`. Successful authentication does not activate routing. The handler remains fail-closed until an explicit downstream Twilio call/SMS route is designed.
