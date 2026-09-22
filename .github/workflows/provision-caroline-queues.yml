@@ -10,33 +10,39 @@ on:
 
 jobs:
   provision:
+    name: Ensure Cloudflare queues exist
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create caroline-event-delivery
-        continue-on-error: true
-        uses: cloudflare/wrangler-action@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: cloudflare/caroline_phone
-          command: queues create caroline-event-delivery
+          node-version: '20'
 
-      - name: Create caroline-event-dlq
-        continue-on-error: true
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: cloudflare/caroline_phone
-          command: queues create caroline-event-dlq
+      - name: Install Worker dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: cloudflare/caroline_phone
 
-      - name: List queues
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: cloudflare/caroline_phone
-          command: queues list
+      - name: Create Queues (idempotent)
+        working-directory: cloudflare/caroline_phone
+        run: |
+          npx wrangler queues create caroline-event-delivery || true
+          npx wrangler queues create caroline-event-dlq || true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify Queues exist
+        working-directory: cloudflare/caroline_phone
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler queues list | tee /tmp/caroline-queues.txt
+          grep -F 'caroline-event-delivery' /tmp/caroline-queues.txt >/dev/null
+          grep -F 'caroline-event-dlq' /tmp/caroline-queues.txt >/dev/null
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
