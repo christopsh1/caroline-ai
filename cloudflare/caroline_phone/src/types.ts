@@ -3,6 +3,8 @@ export interface Env {
   CAROLINE_KEY?: string
   CORE_RUNTIME_KEY?: string
   ELEVENLABS_WEBHOOK_SECRET?: string
+  ELEVENLABS_API_KEY?: string
+  ELEVENLABS_AGENT_ID?: string
   PHONE_TOOL_POLICY_JSON?: string
   TWILIO_AUTH_TOKEN?: string
   OPEN_ROUTER_KEY?: string
