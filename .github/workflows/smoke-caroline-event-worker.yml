@@ -1,0 +1,61 @@
+name: Smoke Test Caroline Event Worker
+
+on:
+  push:
+    branches:
+      - ops/test-caroline-event-worker
+    paths:
+      - .github/workflows/smoke-caroline-event-worker.yml
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health, create, retrieve, and delivery poll
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://caroline-event-worker.customerservice-882.workers.dev'
+
+          echo '=== HEALTH ==='
+          health_code="$(curl -sS -o /tmp/health.json -w '%{http_code}' "$BASE/health")"
+          echo "health_http=$health_code"
+          cat /tmp/health.json; echo
+          [[ "$health_code" =~ ^2 ]]
+
+          echo '=== CREATE EVENT ==='
+          create_code="$(curl -sS -o /tmp/create.json -w '%{http_code}' -X POST "$BASE/events" -H 'Content-Type: application/json' -d '{"type":"order.created","payload":{"order_id":"12345","customer":"Caroline"}}')"
+          echo "create_http=$create_code"
+          cat /tmp/create.json; echo
+          [[ "$create_code" =~ ^2 ]]
+
+          event_id="$(jq -r '.id // .event_id // .event.id // empty' /tmp/create.json)"
+          if [[ -z "$event_id" || "$event_id" == "null" ]]; then
+            echo 'No event ID found in create response.'
+            exit 1
+          fi
+          echo "event_id=$event_id"
+
+          echo '=== RETRIEVE / DELIVERY POLL ==='
+          delivered=0
+          for attempt in $(seq 1 12); do
+            get_code="$(curl -sS -o /tmp/get.json -w '%{http_code}' "$BASE/events/$event_id")"
+            echo "attempt=$attempt retrieve_http=$get_code"
+            cat /tmp/get.json; echo
+            [[ "$get_code" =~ ^2 ]]
+
+            state="$(jq -r '.status // .delivery_status // .event.status // empty' /tmp/get.json | tr '[:upper:]' '[:lower:]')"
+            flag="$(jq -r '.delivered // .event.delivered // false' /tmp/get.json | tr '[:upper:]' '[:lower:]')"
+            if [[ "$state" == "delivered" || "$flag" == "true" ]]; then
+              delivered=1
+              echo 'delivery_verified=true'
+              break
+            fi
+            sleep 2
+          done
+
+          if [[ "$delivered" -ne 1 ]]; then
+            echo 'Event was retrievable, but delivered state was not observed within 24 seconds.'
+            exit 1
+          fi
