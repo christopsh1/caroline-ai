@@ -1,11 +1,33 @@
-name = "caroline-event-worker"
-main = "src/index.js"
-compatibility_date = "2026-09-23"
+name = "caroline-phone"
 account_id = "882fc7501e4632c7c58879d5c1d5b672"
+main = "src/index.ts"
+compatibility_date = "2026-09-23"
+compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 [observability]
 enabled = true
+
+# Runtime secrets are configured in Cloudflare, never committed here:
+# CAROLINE_KEY
+# CORE_RUNTIME_KEY
+# ELEVENLABS_WEBHOOK_SECRET
+# ELEVENLABS_API_KEY
+# TWILIO_AUTH_TOKEN
+# OPEN_ROUTER_KEY
+
+[vars]
+ENVIRONMENT = "production"
+ELEVENLABS_AGENT_ID = "agent_8001m2ba4rmder6t7wq270ntj43j"
+PHONE_TOOL_POLICY_JSON = "{\"owner\":[],\"external\":[],\"unknown\":[],\"outbound\":[],\"hold\":[],\"calendar_read\":[],\"reentry\":[]}"
+
+[exports.CarolineSession]
+type = "durable-object"
+storage = "sqlite"
+
+[[durable_objects.bindings]]
+name = "CAROLINE_SESSIONS"
+class_name = "CarolineSession"
 
 [[kv_namespaces]]
 binding = "CAROLINE_PHONE"

@@ -1,15 +1,11 @@
-name: Deploy caroline-event-worker
+name: Deploy caroline-phone
 
 on:
   push:
     branches: [main]
     paths:
-      - 'cloudflare/src/**'
-      - 'cloudflare/wrangler.toml'
-      - 'cloudflare/package.json'
-      - 'cloudflare/.env.example'
-      - 'cloudflare/README.md'
-      - '.github/workflows/deploy-caroline-event-worker.yml'
+      - 'cloudflare/caroline_phone/**'
+      - '.github/workflows/deploy-caroline-phone.yml'
   workflow_dispatch:
 
 permissions:
@@ -28,11 +24,11 @@ jobs:
           node-version: '24'
 
       - name: Install dependencies
-        working-directory: cloudflare
+        working-directory: cloudflare/caroline_phone
         run: npm install --no-audit --no-fund
 
-      - name: Validate Worker config
-        working-directory: cloudflare
+      - name: Validate phone Worker
+        working-directory: cloudflare/caroline_phone
         run: npm run check
 
       - name: Deploy to Cloudflare
@@ -40,5 +36,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: cloudflare
+          workingDirectory: cloudflare/caroline_phone
           command: deploy
