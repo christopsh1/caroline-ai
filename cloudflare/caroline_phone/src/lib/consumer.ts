@@ -22,10 +22,10 @@ export async function consumeEventBatch(batch: MessageBatch<QueuedEventPointer>,
   for (const message of batch.messages) {
     const pointer = message.body
     if (!validPointer(pointer)) { log('error', 'queue_pointer_invalid'); message.ack(); continue }
-    if (!env.CAROLINE_PAYLOADS) { log('error', 'queue_payload_store_missing', { event_id: pointer.event_id }); message.retry(); continue }
+    if (!env.CAROLINE_EVENTS_RAW) { log('error', 'queue_payload_store_missing', { event_id: pointer.event_id }); message.retry(); continue }
 
     let object: R2ObjectBody | null
-    try { object = await env.CAROLINE_PAYLOADS.get(pointer.object_key) } catch { message.retry(); continue }
+    try { object = await env.CAROLINE_EVENTS_RAW.get(pointer.object_key) } catch { message.retry(); continue }
     if (!object) { log('error', 'queue_payload_missing', { event_id: pointer.event_id }); message.retry(); continue }
 
     let rawEnvelope: string
@@ -50,7 +50,7 @@ export async function consumeEventBatch(batch: MessageBatch<QueuedEventPointer>,
         request_id: parsed.request_id, delivered_at: new Date().toISOString(), environment: parsed.environment,
       })
     } catch {}
-    try { await env.CAROLINE_PAYLOADS.delete(pointer.object_key) } catch {}
+    try { await env.CAROLINE_EVENTS_RAW.delete(pointer.object_key) } catch {}
     message.ack()
   }
 }
