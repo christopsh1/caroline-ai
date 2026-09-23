@@ -1,0 +1,20 @@
+services:
+  archive-restore-db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: caroline_restore_test
+      POSTGRES_USER: restore_test
+      POSTGRES_PASSWORD: local-ephemeral-only
+    tmpfs:
+      - /var/lib/postgresql/data
+    networks:
+      - isolated
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U restore_test -d caroline_restore_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+networks:
+  isolated:
+    internal: true
