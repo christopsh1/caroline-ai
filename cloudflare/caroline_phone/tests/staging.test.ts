@@ -24,7 +24,7 @@ const envelope: CarolineEventEnvelope = {
 test('stages full envelope in R2 and queues only a pointer', async () => {
   const r2 = new MemoryR2()
   const queue = new MemoryQueue()
-  const result = await stageAndQueueEvent({ CAROLINE_PAYLOADS: r2 as any, CAROLINE_EVENT_QUEUE: queue as any }, envelope)
+  const result = await stageAndQueueEvent({ CAROLINE_EVENTS_RAW: r2 as any, EVENT_DELIVERY: queue as any }, envelope)
   assert.equal(result.ok, true)
   assert.equal(queue.messages.length, 1)
   const pointer = queue.messages[0]
@@ -36,7 +36,7 @@ test('stages full envelope in R2 and queues only a pointer', async () => {
 test('removes staged object when queue send fails', async () => {
   const r2 = new MemoryR2()
   const queue = { send: async () => { throw new Error('queue down') } }
-  const result = await stageAndQueueEvent({ CAROLINE_PAYLOADS: r2 as any, CAROLINE_EVENT_QUEUE: queue as any }, envelope)
+  const result = await stageAndQueueEvent({ CAROLINE_EVENTS_RAW: r2 as any, EVENT_DELIVERY: queue as any }, envelope)
   assert.deepEqual(result, { ok: false, reason: 'queue_send_failed' })
   assert.equal(r2.objects.size, 0)
 })
