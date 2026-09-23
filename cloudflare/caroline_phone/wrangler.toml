@@ -1,0 +1,20 @@
+name = "caroline-phone"
+main = "src/index.ts"
+compatibility_date = "2026-09-23"
+account_id = "882fc7501e4632c7c58879d5c1d5b672"
+workers_dev = true
+
+[observability]
+enabled = true
+
+[vars]
+ELEVENLABS_AGENT_ID = "agent_8001m2ba4rmder6t7wq270ntj43j"
+AMD_HANGUP_MACHINE = "false"
+
+[[durable_objects.bindings]]
+name = "CALL_SESSIONS"
+class_name = "CallSession"
+
+[exports.CallSession]
+type = "durable-object"
+storage = "sqlite"

@@ -1,0 +1,31 @@
+name: Validate caroline-phone
+
+on:
+  pull_request:
+    paths:
+      - 'cloudflare/caroline_phone/**'
+      - '.github/workflows/validate-caroline-phone.yml'
+  push:
+    branches:
+      - 'voice/register-call-production'
+    paths:
+      - 'cloudflare/caroline_phone/**'
+      - '.github/workflows/validate-caroline-phone.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        working-directory: cloudflare/caroline_phone
+        run: npm install --no-audit --no-fund
+      - name: Typecheck, synthetic tests, and Wrangler dry-run
+        working-directory: cloudflare/caroline_phone
+        run: npm run check
