@@ -35,9 +35,9 @@ test('call-start variables are fail-closed for identity and permissions', () => 
 })
 
 test('outbound register payload carries only the supplied owner brief plus safe defaults', async () => {
-  let captured: Record<string, unknown> | null = null
+  const requests: Record<string, unknown>[] = []
   const fetcher = (async (_input: RequestInfo | URL, init?: RequestInit) => {
-    captured = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+    requests.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>)
     return new Response(JSON.stringify('<Response><Connect/></Response>'), {
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -52,9 +52,11 @@ test('outbound register payload carries only the supplied owner brief plus safe 
   })
 
   assert.equal(twiml, '<Response><Connect/></Response>')
-  assert.equal(captured?.agent_id, 'agent_test')
-  assert.equal(captured?.direction, 'outbound')
-  const initiation = captured?.conversation_initiation_client_data as { dynamic_variables?: Record<string, string> }
+  assert.equal(requests.length, 1)
+  const captured = requests[0]!
+  assert.equal(captured.agent_id, 'agent_test')
+  assert.equal(captured.direction, 'outbound')
+  const initiation = captured.conversation_initiation_client_data as { dynamic_variables?: Record<string, string> }
   assert.equal(initiation.dynamic_variables?.outbound_call_brief_json, '{"purpose":"test"}')
   assert.equal(initiation.dynamic_variables?.caller_identity_status, 'unknown')
 })
