@@ -1,13 +1,18 @@
 export interface Env {
   ENVIRONMENT?: string
   CAROLINE_KEY?: string
+  CORE_RUNTIME_KEY?: string
   ELEVENLABS_WEBHOOK_SECRET?: string
   PHONE_TOOL_POLICY_JSON?: string
   TWILIO_AUTH_TOKEN?: string
-  Caroline_Phone?: KVNamespace
-  CAROLINE_PAYLOADS?: R2Bucket
-  CAROLINE_EVENT_QUEUE?: Queue<QueuedEventPointer>
-  CAROLINE_EVENT_DLQ?: Queue<QueuedEventPointer>
+  OPEN_ROUTER_KEY?: string
+  CAROLINE_PHONE?: KVNamespace
+  CAROLINE_EVENTS_RAW?: R2Bucket
+  CAROLINE_TRANSCRIPTS?: R2Bucket
+  CAROLINE_ARTIFACTS?: R2Bucket
+  CAROLINE_MEDIA?: R2Bucket
+  CAROLINE_DB?: D1Database
+  EVENT_DELIVERY?: Queue<QueuedEventPointer>
   CAROLINE_SESSIONS?: DurableObjectNamespace
 }
 
