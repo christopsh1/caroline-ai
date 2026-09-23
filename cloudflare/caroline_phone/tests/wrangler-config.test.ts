@@ -2,16 +2,19 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 
-test('wrangler config binds Durable Object, production delivery queue/DLQ, isolated dev queues, and keeps secrets out of vars', () => {
+test('wrangler config binds the fresh Caroline Worker inventory and keeps secret values out of vars', () => {
   const text=readFileSync(new URL('../wrangler.toml', import.meta.url).pathname,'utf8')
+  assert.match(text,/name = "caroline-event-worker"/)
   assert.match(text,/\[exports\.CarolineSession\][\s\S]*storage = "sqlite"/)
-  assert.match(text,/\[\[env\.dev\.durable_objects\.bindings\]\][\s\S]*name = "CAROLINE_SESSIONS"/)
-  assert.match(text,/binding = "Caroline_Phone"[\s\S]*85679a0030e846ee931226aa1a6e6332/)
-  assert.match(text,/binding = "CAROLINE_EVENT_QUEUE"[\s\S]*queue = "caroline-event-delivery"/)
-  assert.match(text,/binding = "CAROLINE_EVENT_DLQ"[\s\S]*queue = "caroline-event-dlq"/)
-  assert.match(text,/queue = "caroline-event-delivery"[\s\S]*max_batch_size = 10[\s\S]*max_batch_timeout = 5[\s\S]*max_retries = 3[\s\S]*dead_letter_queue = "caroline-event-dlq"/)
-  assert.match(text,/\[\[env\.dev\.queues\.producers\]\][\s\S]*binding = "CAROLINE_EVENT_QUEUE"[\s\S]*queue = "caroline-phone-events-dev"/)
-  assert.match(text,/\[\[env\.dev\.queues\.consumers\]\][\s\S]*queue = "caroline-phone-events-dev"[\s\S]*dead_letter_queue = "caroline-phone-events-dev-dlq"/)
-  assert.doesNotMatch(text,/CAROLINE_EVENTS/)
-  assert.doesNotMatch(text,/CORE_RUNTIME_URL|CORE_RUNTIME_KEY|EVENT_SINK_URL|EVENT_SINK_KEY/)
+  assert.match(text,/\[\[durable_objects\.bindings\]\][\s\S]*name = "CAROLINE_SESSIONS"/)
+  assert.match(text,/binding = "CAROLINE_PHONE"[\s\S]*85679a0030e846ee931226aa1a6e6332/)
+  assert.match(text,/binding = "CAROLINE_EVENTS_RAW"[\s\S]*bucket_name = "caroline-events-raw"/)
+  assert.match(text,/binding = "CAROLINE_TRANSCRIPTS"[\s\S]*bucket_name = "caroline-transcripts"/)
+  assert.match(text,/binding = "CAROLINE_ARTIFACTS"[\s\S]*bucket_name = "caroline-artifacts"/)
+  assert.match(text,/binding = "CAROLINE_MEDIA"[\s\S]*bucket_name = "caroline-media"/)
+  assert.match(text,/binding = "CAROLINE_DB"[\s\S]*database_id = "e350a176-c2be-4b5c-9975-bebb157e944a"/)
+  assert.match(text,/binding = "EVENT_DELIVERY"[\s\S]*queue = "caroline-event-delivery"/)
+  const vars = text.match(/\[vars\]([\s\S]*?)(?:\n\[|$)/)?.[1] ?? ''
+  assert.doesNotMatch(vars,/CAROLINE_KEY|CORE_RUNTIME_KEY|ELEVENLABS_WEBHOOK_SECRET|TWILIO_AUTH_TOKEN|OPEN_ROUTER_KEY/)
+  assert.doesNotMatch(text,/binding = "Caroline_Phone"|binding = "CAROLINE_PAYLOADS"|binding = "CAROLINE_EVENT_QUEUE"/)
 })
