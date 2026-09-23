@@ -6,12 +6,12 @@ export type StageResult =
   | { ok: false; reason: 'payload_store_not_configured' | 'queue_not_configured' | 'payload_store_failed' | 'queue_send_failed' }
 
 export function asyncPipelineReady(env: Env): boolean {
-  return Boolean(env.CAROLINE_PAYLOADS && env.CAROLINE_EVENT_QUEUE)
+  return Boolean(env.CAROLINE_EVENTS_RAW && env.EVENT_DELIVERY)
 }
 
 export async function stageAndQueueEvent(env: Env, envelope: CarolineEventEnvelope): Promise<StageResult> {
-  if (!env.CAROLINE_PAYLOADS) return { ok: false, reason: 'payload_store_not_configured' }
-  if (!env.CAROLINE_EVENT_QUEUE) return { ok: false, reason: 'queue_not_configured' }
+  if (!env.CAROLINE_EVENTS_RAW) return { ok: false, reason: 'payload_store_not_configured' }
+  if (!env.EVENT_DELIVERY) return { ok: false, reason: 'queue_not_configured' }
 
   const body = JSON.stringify(envelope)
   const envelopeHash = await sha256Hex(body)
@@ -20,7 +20,7 @@ export async function stageAndQueueEvent(env: Env, envelope: CarolineEventEnvelo
   const objectKey = `events/${environment}/${datePrefix}/${envelopeHash}.json`
 
   try {
-    await env.CAROLINE_PAYLOADS.put(objectKey, body, {
+    await env.CAROLINE_EVENTS_RAW.put(objectKey, body, {
       httpMetadata: { contentType: 'application/json' },
       customMetadata: {
         event_id: envelope.event_id,
@@ -46,9 +46,9 @@ export async function stageAndQueueEvent(env: Env, envelope: CarolineEventEnvelo
   }
 
   try {
-    await env.CAROLINE_EVENT_QUEUE.send(pointer)
+    await env.EVENT_DELIVERY.send(pointer)
   } catch {
-    try { await env.CAROLINE_PAYLOADS.delete(objectKey) } catch { /* cleanup best effort */ }
+    try { await env.CAROLINE_EVENTS_RAW.delete(objectKey) } catch { /* cleanup best effort */ }
     return { ok: false, reason: 'queue_send_failed' }
   }
 
