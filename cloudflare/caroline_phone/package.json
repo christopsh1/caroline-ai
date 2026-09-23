@@ -1,0 +1,24 @@
+{
+  "name": "caroline-phone-edge",
+  "version": "3.10.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --env dev",
+    "deploy:dev": "wrangler deploy --env dev",
+    "deploy:prod": "wrangler deploy --env production",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "check": "npm run typecheck && npm test",
+    "inventory:cloudflare": "node scripts/inventory-cloudflare.mjs",
+    "secrets:list:dev": "wrangler secret list --env dev",
+    "secrets:list:prod": "wrangler secret list --env production",
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:elevenlabs": "node scripts/synthetic-elevenlabs.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260919.0",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.38.0"
+  }
+}
