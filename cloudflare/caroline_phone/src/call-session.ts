@@ -1,45 +1,81 @@
-export interface CallState {
-  call_sid?: string
-  direction?: 'inbound' | 'outbound'
+export type CallDirection = 'inbound' | 'outbound'
+
+export type CallSessionState = {
+  call_sid: string
+  direction?: CallDirection
   from_number?: string
   to_number?: string
-  status?: string
+  register_status?: 'registering' | 'registered' | 'register_failed'
+  call_status?: string
   answered_by?: string
-  outbound_call_brief_json?: string
-  created_at?: string
-  updated_at?: string
   registered_at?: string
-  completed_at?: string
+  created_at: string
+  updated_at: string
 }
 
-const STATE_KEY = 'call_state'
+type DurableObjectStorageLike = {
+  get<T>(key: string): Promise<T | undefined>
+  put(key: string, value: unknown): Promise<void>
+}
+
+type DurableObjectStateLike = {
+  storage: DurableObjectStorageLike
+}
+
+type DurableObjectIdLike = unknown
+
+type DurableObjectStubLike = {
+  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
+}
+
+export type CallSessionBinding = {
+  idFromName(name: string): DurableObjectIdLike
+  get(id: DurableObjectIdLike): DurableObjectStubLike
+}
 
 export class CallSession {
-  constructor(private readonly state: DurableObjectState) {}
+  constructor(private readonly state: DurableObjectStateLike) {}
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
-    if (url.pathname !== '/state') return new Response('not found', { status: 404 })
+    if (url.pathname !== '/state') return new Response('not_found', { status: 404 })
 
     if (request.method === 'GET') {
-      const value = (await this.state.storage.get<CallState>(STATE_KEY)) ?? null
-      return Response.json({ ok: true, state: value })
+      const current = await this.state.storage.get<CallSessionState>('call')
+      return Response.json(current ?? null)
     }
 
-    if (request.method === 'POST') {
-      const patch = (await request.json()) as CallState
-      const previous = (await this.state.storage.get<CallState>(STATE_KEY)) ?? {}
+    if (request.method === 'PATCH') {
+      const patch = (await request.json()) as Partial<CallSessionState>
+      const current = await this.state.storage.get<CallSessionState>('call')
       const now = new Date().toISOString()
-      const next: CallState = {
-        ...previous,
+      const next: CallSessionState = {
+        ...(current ?? ({} as CallSessionState)),
         ...patch,
-        created_at: previous.created_at ?? patch.created_at ?? now,
+        call_sid: patch.call_sid ?? current?.call_sid ?? '',
+        created_at: current?.created_at ?? patch.created_at ?? now,
         updated_at: now,
       }
-      await this.state.storage.put(STATE_KEY, next)
-      return Response.json({ ok: true, state: next })
+      if (!next.call_sid) return new Response('call_sid_required', { status: 400 })
+      await this.state.storage.put('call', next)
+      return Response.json(next)
     }
 
-    return new Response('method not allowed', { status: 405 })
+    return new Response('method_not_allowed', { status: 405 })
   }
+}
+
+export async function patchCallSession(
+  binding: CallSessionBinding,
+  callSid: string,
+  patch: Partial<CallSessionState>,
+): Promise<void> {
+  const id = binding.idFromName(callSid)
+  const stub = binding.get(id)
+  const response = await stub.fetch('https://call-session.internal/state', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ call_sid: callSid, ...patch }),
+  })
+  if (!response.ok) throw new Error(`call_session_update_${response.status}`)
 }

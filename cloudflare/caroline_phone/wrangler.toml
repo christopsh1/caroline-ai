@@ -9,10 +9,10 @@ enabled = true
 
 [vars]
 ELEVENLABS_AGENT_ID = "agent_8001m2ba4rmder6t7wq270ntj43j"
-AMD_HANGUP_MACHINE = "false"
+ELEVENLABS_BRANCH_ID = "agtbrch_0501m336ns3ffdc8ej3wja70r001"
 
 [[durable_objects.bindings]]
-name = "CALL_SESSIONS"
+name = "CALL_SESSION"
 class_name = "CallSession"
 
 [exports.CallSession]
