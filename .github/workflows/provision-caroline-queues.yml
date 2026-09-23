@@ -7,6 +7,7 @@ on:
       - .github/workflows/provision-caroline-queues.yml
   workflow_dispatch:
 
+# retrigger after repository Actions settings update
 jobs:
   provision:
     runs-on: ubuntu-latest
