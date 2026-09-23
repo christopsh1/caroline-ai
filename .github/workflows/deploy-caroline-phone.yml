@@ -10,17 +10,23 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: '24'
+
       - name: Install dependencies
         working-directory: cloudflare/caroline_phone
         run: npm install --no-audit --no-fund
+
       - name: Validate before deploy
         working-directory: cloudflare/caroline_phone
         run: npm run check
-      - name: Deploy Worker and sync runtime secrets
+
+      - name: Deploy caroline-phone
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -29,13 +35,7 @@ jobs:
           command: deploy
           secrets: |
             ELEVENLABS_API_KEY
-            TWILIO_ACCOUNT_SID
             TWILIO_AUTH_TOKEN
-            TWILIO_PHONE_NUMBER
-            CAROLINE_KEY
         env:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
-          TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_PHONE_NUMBER }}
-          CAROLINE_KEY: ${{ secrets.CAROLINE_KEY }}

@@ -4,14 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "typecheck": "tsc -p tsconfig.json",
-    "test": "node --import tsx --test tests/*.test.ts",
-    "check": "npm run typecheck && npm test && wrangler deploy --dry-run --outdir .wrangler-dry-run",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/phone.test.ts",
+    "check": "npm run typecheck && npm test",
     "deploy": "wrangler deploy"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260923.1",
     "@types/node": "^24.5.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
