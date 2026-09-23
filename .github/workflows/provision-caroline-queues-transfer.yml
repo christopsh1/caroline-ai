@@ -7,6 +7,8 @@ on:
       - .github/workflows/provision-caroline-queues-transfer.yml
   workflow_dispatch:
 
+permissions: write-all
+
 jobs:
   provision:
     runs-on: ubuntu-latest
