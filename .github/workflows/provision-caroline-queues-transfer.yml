@@ -7,6 +7,7 @@ on:
       - .github/workflows/provision-caroline-queues-transfer.yml
   workflow_dispatch:
 
+# retrigger on christopsh1 after connector update
 jobs:
   provision:
     runs-on: ubuntu-latest
