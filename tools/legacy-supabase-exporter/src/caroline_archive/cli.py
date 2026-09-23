@@ -8,7 +8,8 @@ from pathlib import Path
 
 from .errors import ArchiveError
 from .exporter import r2_client_from_env, stage_export, upload_staged
-from .manifest import load_schema
+from .manifest import load_schema, manifest_digest, validate_manifest
+from .checksum import sha256_file
 from .policy import (
     DERIVED_VIEWS,
     IN_SCOPE_RELATIONS,
@@ -20,6 +21,28 @@ from .policy import (
     assert_relation_safe,
 )
 from .source import ReadOnlySupabaseSource
+
+
+def verify_local_manifest(manifest_path: str | Path) -> dict:
+    path = Path(manifest_path)
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    validate_manifest(manifest)
+    expected_manifest_digest = manifest["integrity"]["manifest_sha256"]
+    actual_manifest_digest = "sha256:" + manifest_digest(manifest)
+    if expected_manifest_digest != actual_manifest_digest:
+        raise ValueError("manifest canonical SHA-256 mismatch")
+    verified = []
+    for obj in manifest["objects"]:
+        local = path.parent / Path(obj["key"]).name
+        if not local.is_file():
+            raise ValueError(f"missing staged object: {local.name}")
+        if local.stat().st_size != obj["size_bytes"]:
+            raise ValueError(f"size mismatch: {local.name}")
+        actual = "sha256:" + sha256_file(local)
+        if actual != obj["sha256"]:
+            raise ValueError(f"SHA-256 mismatch: {local.name}")
+        verified.append(local.name)
+    return {"ok": True, "manifest": str(path), "verified_objects": verified, "r2_writes": False}
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -121,10 +144,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.verify:
             if not args.manifest:
                 raise ValueError("--manifest is required with --verify")
-            from .manifest import validate_manifest
-            manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
-            validate_manifest(manifest)
-            print(json.dumps({"ok": True, "manifest": args.manifest, "r2_writes": False}, indent=2))
+            print(json.dumps(verify_local_manifest(args.manifest), indent=2))
             return 0
 
         relations = _require_relations(args.relation)

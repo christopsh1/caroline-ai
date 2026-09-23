@@ -21,7 +21,7 @@ Relations not in the raw-export allowlist remain blocked until a reviewed saniti
 Local unit/safety result:
 
 ```text
-21 passed, 1 skipped
+22 passed, 1 skipped
 ```
 
 The skipped test is optional Parquet parity because `pyarrow` was not installed in the execution environment. The JSONL canonical writer, manifest, policy, R2 collision behavior, secret scanner, redactor and dry-run staging tests passed.
@@ -34,6 +34,7 @@ Covered controls:
 - derived views cannot be raw exported;
 - plan/validate paths do not construct an R2 client;
 - synthetic dry-run stages JSONL + redaction report + complete manifest and performs no upload;
+- local verify detects staged-object size/SHA-256 tampering;
 - secret-pattern detection covers authorization/bearer material, API/token assignments, private keys, credential-bearing Postgres URLs, Cloudflare/Supabase credential categories and JWT-like values;
 - sensitive config fields transform to approved placeholders;
 - object-key collision fails before PUT;

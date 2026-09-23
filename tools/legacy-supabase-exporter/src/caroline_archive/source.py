@@ -154,8 +154,30 @@ class ReadOnlySupabaseSource:
         ).hexdigest()
         return {"relation": relation, "columns": approved, "actual_columns": [row["column_name"] for row in columns], "primary_key": pk, "schema_fingerprint": fingerprint}
 
-    def export_stream(self, relation: str, *, batch_size: int = 1000) -> tuple[dict, Iterable[dict]]:
-        relation = assert_raw_export_allowed(relation)
-        # Metadata is queried only after the relation passed the hard deny/allow checks.
-        description = self.describe(relation)
-        return description, self.stream_rows(relation, batch_size=batch_size)
+    @contextmanager
+    def export_stream(self, relation: str, *, batch_size: int = 1000):
+        """Yield metadata and rows inside one read-only REPEATABLE READ transaction."""
+        relation = assert_raw_export_allowed(relation)  # fail before connection/query
+        columns = APPROVED_COLUMNS[relation]
+        with self.connection() as conn:
+            description = self.describe_with_connection(conn, relation)
+            query = sql.SQL("select {} from {}.{}").format(
+                sql.SQL(", ").join(sql.Identifier(c) for c in columns),
+                sql.Identifier("public"),
+                sql.Identifier(relation),
+            )
+            params: list[object] = []
+            if relation in FILTER_RAG_REFERENCES:
+                query += sql.SQL(" where not ({} = any(%s))").format(sql.Identifier("source_table"))
+                params.append(list(RAG_EXCLUDED_RELATIONS))
+            if description["primary_key"]:
+                query += sql.SQL(" order by {}").format(
+                    sql.SQL(", ").join(sql.Identifier(c) for c in description["primary_key"])
+                )
+            with conn.cursor(name=f"archive_{relation}") as cur:
+                cur.itersize = batch_size
+                cur.execute(query, params)
+                def rows():
+                    for row in cur:
+                        yield dict(row)
+                yield description, rows()

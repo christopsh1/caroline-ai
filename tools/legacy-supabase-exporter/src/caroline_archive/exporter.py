@@ -54,9 +54,9 @@ def stage_export(
     base = Path(output_dir) / relation / f"export={export_id}"
     base.mkdir(parents=True, exist_ok=False)
 
-    description = source.describe(relation)
     jsonl_path = base / "data-00001.jsonl.gz"
-    json_result = write_jsonl_gz(source.stream_rows(relation), jsonl_path, description["primary_key"])
+    with source.export_stream(relation) as (description, rows):
+        json_result = write_jsonl_gz(rows, jsonl_path, description["primary_key"])
 
     data_objects: list[tuple[Path, str, str]] = []
     entries: list[dict[str, Any]] = []
