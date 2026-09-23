@@ -7,7 +7,7 @@ on:
       - '.github/workflows/validate-caroline-phone.yml'
   push:
     branches:
-      - 'voice/register-call-production'
+      - 'voice/**'
     paths:
       - 'cloudflare/caroline_phone/**'
       - '.github/workflows/validate-caroline-phone.yml'

@@ -1,20 +1,21 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
-const wrangler = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8')
+const wrangler = await readFile(new URL('../wrangler.toml', import.meta.url), 'utf8')
+const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
+  scripts?: Record<string, string>
+}
 
-test('caroline-phone is a separate Worker with a SQLite Durable Object', () => {
-  assert.match(wrangler, /name = "caroline-phone"/)
-  assert.match(wrangler, /name = "CALL_SESSIONS"/)
-  assert.match(wrangler, /class_name = "CallSession"/)
-  assert.match(wrangler, /\[exports\.CallSession\]/)
-  assert.match(wrangler, /storage = "sqlite"/)
+test('Worker is named caroline-phone and has no plaintext runtime secrets or vars', () => {
+  assert.match(wrangler, /^name = "caroline-phone"/m)
+  assert.doesNotMatch(wrangler, /^\[vars\]/m)
+  assert.doesNotMatch(wrangler, /ELEVENLABS_API_KEY\s*=/)
+  assert.doesNotMatch(wrangler, /ELEVENLABS_AGENT_ID\s*=/)
+  assert.doesNotMatch(wrangler, /TWILIO_AUTH_TOKEN\s*=/)
+  assert.doesNotMatch(wrangler, /OUTBOUND_API_TOKEN\s*=/)
 })
 
-test('wrangler contains no Twilio phone number or provider secret values', () => {
-  assert.doesNotMatch(wrangler, /TWILIO_PHONE_NUMBER\s*=/)
-  assert.doesNotMatch(wrangler, /TWILIO_AUTH_TOKEN\s*=/)
-  assert.doesNotMatch(wrangler, /ELEVENLABS_API_KEY\s*=/)
-  assert.doesNotMatch(wrangler, /\+[1-9]\d{9,14}/)
+test('deploy preserves Cloudflare-managed secrets and variables', () => {
+  assert.equal(packageJson.scripts?.deploy, 'wrangler deploy --keep-vars')
 })

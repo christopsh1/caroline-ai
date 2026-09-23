@@ -1,47 +1,81 @@
-# Caroline Phone Worker
+# caroline-phone
 
-Cloudflare control plane for Twilio voice calls using ElevenLabs' `POST /v1/convai/twilio/register-call` integration.
+Production Cloudflare Worker for Caroline voice calls using **our own Twilio infrastructure** and ElevenLabs Conversational AI.
 
-This Worker is intentionally separate from the existing `caroline-event-worker` package.
+## Architecture
+
+- Twilio owns telephony and the phone number.
+- Cloudflare Worker owns webhook validation, policy, routing, defensive validation, minimal operational logging, and safe failure behavior.
+- ElevenLabs owns the live voice-agent conversation.
+- Inbound calls use ElevenLabs `POST /v1/convai/twilio/register-call` and return the resulting TwiML directly to Twilio.
+- Outbound calls use ElevenLabs `POST /v1/convai/twilio/outbound-call`.
+- No database is required for this version. The status callback boundary is intentionally isolated so persistence can be added later.
 
 ## Routes
 
-- `GET /health` — non-secret readiness state.
-- `POST /twilio/inbound` — Twilio inbound voice webhook; verifies `X-Twilio-Signature`, stores per-call state, and returns ElevenLabs TwiML.
-- `POST /twilio/outbound` — Twilio voice webhook for calls created by the control endpoint; verifies Twilio and returns ElevenLabs TwiML.
-- `POST /twilio/status` — verified Twilio call-status callback.
-- `POST /twilio/amd` — verified asynchronous answering-machine-detection callback.
-- `POST /calls/outbound` — Caroline control-plane endpoint to create an outbound Twilio call. Requires `x-caroline-key`.
+- `GET /health`
+- `POST /twilio/inbound`
+- `POST /calls/outbound`
+- `POST /twilio/status`
 
-## Cloudflare state
+Unknown routes return `404`; unsupported methods on known routes return `405`.
 
-`CALL_SESSIONS` is a SQLite-backed Durable Object namespace. Each Twilio `CallSid` gets its own object. Active/important call state is never stored only in process globals or KV.
+## Runtime secrets
 
-## Required Worker secrets
+Runtime credentials are read only from the Worker environment. No secret values belong in source, tests, examples, logs, or `wrangler.toml`.
 
-Set these in Cloudflare; never commit their values:
+Required by this implementation:
 
 - `ELEVENLABS_API_KEY`
-- `TWILIO_ACCOUNT_SID`
-- `TWILIO_AUTH_TOKEN`
-- `TWILIO_PHONE_NUMBER`
-- `CAROLINE_KEY`
+- `ELEVENLABS_AGENT_ID`
+- `ELEVENLABS_AGENT_PHONE_NUMBER_ID`
+- `TWILIO_AUTH_TOKEN` — Twilio webhook signature verification uses the account Auth Token, not the API Key Secret.
+- `OUTBOUND_API_TOKEN` — protects `POST /calls/outbound`. During migration, an existing `CAROLINE_KEY` is accepted as a compatibility fallback when `OUTBOUND_API_TOKEN` is not present.
 
-`ELEVENLABS_AGENT_ID` is a non-secret Wrangler variable. `AMD_HANGUP_MACHINE` defaults to `false`; machine detection is only enabled for an outbound request when `machine_detection: true` is supplied.
+Existing Twilio account/API-key credentials may remain in Cloudflare for other operations, but this Worker does not use them to originate calls because outbound calls are intentionally created through ElevenLabs.
 
-## Safety defaults
+## Twilio configuration
 
-Register-call initiation data starts callers as unknown / Tier 0 with no permissions or calendar share. Spoken identity never upgrades authorization. Provider failures return generic TwiML and do not expose internal errors.
+Configure the Twilio voice number to send inbound voice requests by HTTPS `POST` to:
 
-## Cutover sequence
+`/twilio/inbound`
 
-1. `npm install`
-2. `npm run check`
-3. Deploy `caroline-phone` and verify `/health`.
-4. Confirm Worker secrets are present.
-5. Synthetic signed Twilio webhook tests against the deployed Worker.
-6. Confirm ElevenLabs still uses `ulaw_8000` input and output.
-7. Replace remaining legacy runtime dependencies in the live ElevenLabs agent before declaring the Cloudflare path backend-independent.
-8. Only then point the Twilio voice webhook to `/twilio/inbound`.
+Configure Twilio call status callbacks by HTTPS `POST` to:
 
-No Twilio number webhook is changed by merging this package.
+`/twilio/status`
+
+Both endpoints reject invalid `X-Twilio-Signature` values with `403`.
+
+## Outbound authorization
+
+`POST /calls/outbound` requires either:
+
+- `Authorization: Bearer <outbound token>`, or
+- `x-caroline-key` for compatibility with the existing Caroline control plane.
+
+The request body is:
+
+```json
+{
+  "to": "+12155550123",
+  "first_message": "optional string",
+  "metadata": {}
+}
+```
+
+`metadata` is validated and reserved for later policy/audit persistence; arbitrary metadata is not forwarded into ElevenLabs dynamic variables.
+
+## ElevenLabs agent prerequisite
+
+For register-call with Twilio, keep the agent telephony audio formats set to μ-law 8000 Hz for input and output.
+
+## Validation
+
+Run:
+
+```bash
+npm install
+npm run check
+```
+
+`npm run check` performs TypeScript type checking, synthetic tests, and a Wrangler dry-run. Deployment uses `wrangler deploy --keep-vars` so Cloudflare-managed runtime secrets are preserved.
