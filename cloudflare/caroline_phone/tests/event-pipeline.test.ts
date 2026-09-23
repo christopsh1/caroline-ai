@@ -21,7 +21,7 @@ test('verified ElevenLabs event is durably staged and queued even while Neon del
   const raw=JSON.stringify({type:'post_call_transcription',event_timestamp:ts,data:{conversation_id:'conv'}})
   const sig=await hmacSha256Hex(secret,`${ts}.${raw}`)
   const req=new Request('https://edge.test/webhook/elevenlabs',{method:'POST',headers:{'Content-Type':'application/json','ElevenLabs-Signature':`t=${ts},v0=${sig}`},body:raw})
-  const response=await handleElevenLabsWebhook(req,{ENVIRONMENT:'development',ELEVENLABS_WEBHOOK_SECRET:secret,CAROLINE_PAYLOADS:r2 as any,CAROLINE_EVENT_QUEUE:q as any},'r')
+  const response=await handleElevenLabsWebhook(req,{ENVIRONMENT:'development',ELEVENLABS_WEBHOOK_SECRET:secret,CAROLINE_EVENTS_RAW:r2 as any,EVENT_DELIVERY:q as any},'r')
   assert.equal(response.status,200)
   assert.equal(queued.length,1)
   assert.equal(r2.objects.size,1)
@@ -35,7 +35,7 @@ test('queue consumer retries and retains staged R2 payload while canonical Neon 
   const pointer:QueuedEventPointer={schema_version:'1',event_id:'e',request_id:'r',environment:'development',source:'elevenlabs',source_event_type:'post_call_transcription',received_at:envelope.received_at,object_key:'x',envelope_sha256:await sha256Hex(raw)}
   r2.objects.set('x',raw)
   const message={body:pointer,acked:false,retried:false,ack(){this.acked=true},retry(){this.retried=true}}
-  await consumeEventBatch({messages:[message]} as any,{CAROLINE_PAYLOADS:r2 as any})
+  await consumeEventBatch({messages:[message]} as any,{CAROLINE_EVENTS_RAW:r2 as any})
   assert.equal(message.retried,true)
   assert.equal(message.acked,false)
   assert.equal(r2.objects.has('x'),true)
