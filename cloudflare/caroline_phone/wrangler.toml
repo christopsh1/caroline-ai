@@ -1,109 +1,62 @@
-name = "caroline-phone"
+name = "caroline-event-worker"
 account_id = "882fc7501e4632c7c58879d5c1d5b672"
 main = "src/index.ts"
-compatibility_date = "2026-09-01"
+compatibility_date = "2026-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 [observability]
 enabled = true
 
+# Runtime secrets are configured in Cloudflare, never committed here:
+# CAROLINE_KEY
+# CORE_RUNTIME_KEY
+# ELEVENLABS_WEBHOOK_SECRET
+# TWILIO_AUTH_TOKEN
+# OPEN_ROUTER_KEY
+
+[vars]
+ENVIRONMENT = "production"
+PHONE_TOOL_POLICY_JSON = "{\"owner\":[],\"external\":[],\"unknown\":[],\"outbound\":[],\"hold\":[],\"calendar_read\":[],\"reentry\":[]}"
+
 [exports.CarolineSession]
 type = "durable-object"
 storage = "sqlite"
 
-[[queues.producers]]
-binding = "CAROLINE_EVENT_QUEUE"
-queue = "caroline-event-delivery"
+[[durable_objects.bindings]]
+name = "CAROLINE_SESSIONS"
+class_name = "CarolineSession"
+
+[[kv_namespaces]]
+binding = "CAROLINE_PHONE"
+id = "85679a0030e846ee931226aa1a6e6332"
+
+[[r2_buckets]]
+binding = "CAROLINE_EVENTS_RAW"
+bucket_name = "caroline-events-raw"
+
+[[r2_buckets]]
+binding = "CAROLINE_TRANSCRIPTS"
+bucket_name = "caroline-transcripts"
+
+[[r2_buckets]]
+binding = "CAROLINE_ARTIFACTS"
+bucket_name = "caroline-artifacts"
+
+[[r2_buckets]]
+binding = "CAROLINE_MEDIA"
+bucket_name = "caroline-media"
+
+[[d1_databases]]
+binding = "CAROLINE_DB"
+database_name = "CAROLINE_DB"
+database_id = "e350a176-c2be-4b5c-9975-bebb157e944a"
 
 [[queues.producers]]
-binding = "CAROLINE_EVENT_DLQ"
-queue = "caroline-event-dlq"
+binding = "EVENT_DELIVERY"
+queue = "caroline-event-delivery"
 
 [[queues.consumers]]
 queue = "caroline-event-delivery"
 max_batch_size = 10
 max_batch_timeout = 5
 max_retries = 3
-dead_letter_queue = "caroline-event-dlq"
-
-[env.dev]
-name = "caroline-phone-dev"
-
-[env.dev.vars]
-ENVIRONMENT = "development"
-PHONE_TOOL_POLICY_JSON = "{\"owner\":[],\"external\":[],\"unknown\":[],\"outbound\":[],\"hold\":[],\"calendar_read\":[],\"reentry\":[]}"
-
-[env.dev.secrets]
-required = [
-  "CAROLINE_KEY",
-  "ELEVENLABS_WEBHOOK_SECRET",
-  "TWILIO_AUTH_TOKEN",
-]
-
-[[env.dev.durable_objects.bindings]]
-name = "CAROLINE_SESSIONS"
-class_name = "CarolineSession"
-
-[[env.dev.kv_namespaces]]
-binding = "Caroline_Phone"
-id = "85679a0030e846ee931226aa1a6e6332"
-
-[[env.dev.r2_buckets]]
-binding = "CAROLINE_PAYLOADS"
-bucket_name = "caroline-phone-payloads-dev"
-
-[[env.dev.queues.producers]]
-binding = "CAROLINE_EVENT_QUEUE"
-queue = "caroline-phone-events-dev"
-
-[[env.dev.queues.producers]]
-binding = "CAROLINE_EVENT_DLQ"
-queue = "caroline-phone-events-dev-dlq"
-
-[[env.dev.queues.consumers]]
-queue = "caroline-phone-events-dev"
-max_batch_size = 10
-max_batch_timeout = 5
-max_retries = 3
-dead_letter_queue = "caroline-phone-events-dev-dlq"
-
-[env.production]
-name = "caroline-phone"
-
-[env.production.vars]
-ENVIRONMENT = "production"
-PHONE_TOOL_POLICY_JSON = "{\"owner\":[],\"external\":[],\"unknown\":[],\"outbound\":[],\"hold\":[],\"calendar_read\":[],\"reentry\":[]}"
-
-[env.production.secrets]
-required = [
-  "CAROLINE_KEY",
-  "ELEVENLABS_WEBHOOK_SECRET",
-  "TWILIO_AUTH_TOKEN",
-]
-
-[[env.production.durable_objects.bindings]]
-name = "CAROLINE_SESSIONS"
-class_name = "CarolineSession"
-
-[[env.production.kv_namespaces]]
-binding = "Caroline_Phone"
-id = "85679a0030e846ee931226aa1a6e6332"
-
-[[env.production.r2_buckets]]
-binding = "CAROLINE_PAYLOADS"
-bucket_name = "caroline-phone-payloads"
-
-[[env.production.queues.producers]]
-binding = "CAROLINE_EVENT_QUEUE"
-queue = "caroline-event-delivery"
-
-[[env.production.queues.producers]]
-binding = "CAROLINE_EVENT_DLQ"
-queue = "caroline-event-dlq"
-
-[[env.production.queues.consumers]]
-queue = "caroline-event-delivery"
-max_batch_size = 10
-max_batch_timeout = 5
-max_retries = 3
-dead_letter_queue = "caroline-event-dlq"
