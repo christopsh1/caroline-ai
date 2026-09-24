@@ -31,3 +31,13 @@ This repository is the source-controlled baseline of the Caroline production sys
 ## Safety
 
 Do not apply files from this repository to production automatically. Stabilization work should occur on explicit non-production branches and be reviewed before any promotion.
+
+## Cloudflare MCP
+
+The repository connects MCP-compatible clients to Cloudflare's full API server through
+the project-level [`.mcp.json`](.mcp.json) configuration. The server uses Cloudflare
+OAuth, so each developer must complete the browser authorization flow presented by
+their MCP client; no API token or account credential is stored in this repository.
+
+Restart or reload the MCP client after cloning, then enable the `cloudflare` server.
+Access remains limited to the accounts, zones, and permissions granted during OAuth.
