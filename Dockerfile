@@ -4,4 +4,4 @@ EXPOSE 8811
 
 # MCP_GATEWAY_AUTH_TOKEN is read by the gateway for bearer-token auth.
 ENTRYPOINT ["/docker-mcp", "gateway", "run"]
-CMD ["--transport=sse", "--host=0.0.0.0", "--port=8811"]
+CMD ["--transport=sse", "--host=0.0.0.0", "--port=8811", "--servers=github", "--servers=cloudflare", "--servers=elevenlabs", "--servers=supabase"]
