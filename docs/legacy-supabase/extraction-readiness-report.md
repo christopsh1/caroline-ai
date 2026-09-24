@@ -1,32 +1,58 @@
 # Extraction readiness report
 
-Generated for branch: `archive/legacy-supabase-r2-extractor`
+Branch: `archive/legacy-supabase-r2-extractor`
+
+Current state: **ready for credential-bound live dry-run**. No real R2 archive write has been performed.
 
 ## Scope implemented
 
-Safe extraction tooling and documentation only. No real R2 archive write, Supabase mutation, RAG access/change, phone-system change, Worker deployment, Neon migration, cleanup, credential rotation, lifecycle change, or bucket-lock change was performed.
+Safe extraction tooling and documentation only. No Supabase mutation, RAG access/change, phone-system change, Worker deployment, Neon migration, cleanup, credential rotation, R2 lifecycle change, or bucket-lock change was performed.
 
 ## Policy inventory
 
 - In-scope non-RAG relations with one disposition each: **46**.
-- Raw-export allowlist: **26** relations.
+- Owner-approved raw-export allowlist: **26** relations.
 - RAG exclusion denylist: **9** relations.
 - Prohibited secret sources: **1** (`vault.decrypted_secrets`).
 - Derived views blocked from authoritative row export: **2**.
 
-Relations not in the raw-export allowlist remain blocked until a reviewed sanitized transform or explicit owner decision is supplied.
+The complete 26-relation raw-export set and existing redaction policy are owner-approved. Communications (`call_history`, `call_turns`, `sms_history`) remain classified `restricted` but are approved for private archive export.
+
+Relations outside the raw-export allowlist remain fail-closed unless they use their separately reviewed sanitized/template path. Owner approval does not bypass RAG or secret exclusions.
+
+## Live source validation
+
+Read-only validation against Supabase project `drsyygxqwxuyoyjbsaqs` confirmed:
+
+- all 26 approved relations currently exist;
+- all 26 have stable primary keys;
+- all exporter-approved selected columns exist in the live schema;
+- current total source rows across the approved set: **453**;
+- `call_history`: **52** rows;
+- `call_turns`: **98** rows;
+- `sms_history`: **0** rows.
+
+These counts are validation evidence only. Real archive manifests must use counts and checksums observed inside each relation's read-only repeatable-read export transaction.
+
+The approved-column schema check required metadata only and did not query excluded RAG relations or `vault.decrypted_secrets`.
+
+## Archive run identity
+
+A multi-relation dry-run or write now generates **one immutable ULID for the entire run**. Every approved relation in that run uses the same `export=<ULID>` identifier while retaining a separate dataset manifest and checksum.
 
 ## Tests
 
-Local unit/safety result:
+Last completed local unit/safety suite before the single-run ULID hardening:
 
 ```text
 22 passed, 1 skipped
 ```
 
-The skipped test is optional Parquet parity because `pyarrow` was not installed in the execution environment. The JSONL canonical writer, manifest, policy, R2 collision behavior, secret scanner, redactor and dry-run staging tests passed.
+The skip was optional Parquet parity because `pyarrow` was not installed in that environment.
 
-Covered controls:
+A regression test for one-run/one-ULID behavior has since been added. A test-only GitHub Actions workflow has also been added to run static validation and `pytest` without Supabase or R2 credentials. That new CI/local regression run is still pending; this report does not claim it has executed.
+
+Previously validated controls include:
 
 - every RAG-excluded relation fails with `RAG_EXCLUDED_LEGACY_SURFACE`;
 - `vault.decrypted_secrets` fails with `PROHIBITED_SECRET_SOURCE`;
@@ -40,41 +66,61 @@ Covered controls:
 - object-key collision fails before PUT;
 - bucket routing is deterministic;
 - manifest validates against JSON Schema;
-- JSONL row count/checksum is deterministic and order-independent;
-- optional Parquet test exists and is enabled when `pyarrow` is installed.
+- JSONL row count/checksum is deterministic and order-independent.
 
-## Secret scanning
+## Dry-run and write runner
 
-Production exporter source, configuration, schemas, documentation, templates and runbooks scanned: **33 files**.
+The owner-approved full relation set is encoded in:
 
-Findings: **0**.
+```text
+tools/legacy-supabase-exporter/scripts/run-approved-set.sh
+```
 
-Scanner unit-test fixtures intentionally contain synthetic credential-like strings and are excluded from the production-artifact scan because their purpose is to prove detection.
+Default/safe next execution:
 
-## Dry-run status
+```bash
+bash scripts/run-approved-set.sh dry-run
+```
 
-Synthetic dry-run: **passed**.
+Real archive write, after the dry-run succeeds and all runtime bindings exist:
 
-A live database dry-run using the newly created CLI was **not performed in this implementation pass**, because this environment was not provided a separate runtime `SUPABASE_DB_URL` credential to the local/Codespaces package. The tooling itself is designed to require that read-only credential only at execution time and never log it.
+```bash
+bash scripts/run-approved-set.sh write
+```
 
-No R2 credential was requested or used.
+The write runner reaches the R2 path only through the exporter's explicit `--confirm-archive-write` mode.
 
-## External writes
+## Remaining runtime bindings
 
-- Git branch/files: **yes**, after local validation, to the dedicated implementation branch only.
+A live dry-run requires runtime-only:
+
+```text
+SUPABASE_DB_URL
+```
+
+A real archive write additionally requires:
+
+```text
+R2_ENDPOINT_URL
+R2_ACCESS_KEY_ID
+R2_SECRET_ACCESS_KEY
+```
+
+The exact Supabase Session pooler connection string should be copied from the Caroline project's **Connect** panel after the database password is known/reset. Secret values must remain outside Git, chat, manifests, logs, and reports.
+
+## External writes/status
+
+- Git branch/files: **yes**, dedicated archive tooling branch only.
 - R2 writes: **no**.
 - Supabase writes: **no**.
 - Supabase RAG row queries by the exporter: **no**.
 - RAG changes: **no**.
 - Phone/runtime changes: **no**.
 
-## Owner decisions required before a real archive write
+## Remaining gate
 
-1. Approve the exact subset of the 26 raw-export-allowlisted relations for the first archive run.
-2. Approve the explicit approved-column sets in `tools/legacy-supabase-exporter/src/caroline_archive/policy.py` and the `--plan` output.
-3. Decide whether restricted identity/reference relations currently blocked as `SENSITIVE_EXCLUDE_OR_REDACT` should ever receive a raw private-R2 export or only sanitized contract capture.
-4. Decide whether `brain_turn_cache` and `system_doc_revisions`, both `RETAIN_FOR_REVIEW`, should be archived at all. They are blocked by default because they can duplicate contextual/system material that should not cross the RAG boundary accidentally.
-5. Approve read-only Supabase credential scope and create-only/non-delete R2 credential scope outside Git/chat.
-6. Invoke the exact `--confirm-archive-write` mode for the approved relation set.
+No further relation/redaction approval is required for the current 26-relation raw-export set.
 
-No cleanup or retirement decision is implied by archive readiness.
+The remaining gate is operational only: provide the runtime secret bindings, execute the full approved-set live dry-run, verify the staged manifests/checksums/secret scan, and then execute the explicitly confirmed archive write.
+
+No cleanup, retirement, deletion, or runtime cutover is implied by archive readiness.
