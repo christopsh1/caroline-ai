@@ -1,0 +1,4 @@
+Cloudflare-observed Supabase pg_net egress for this one-time archive run:
+2600:1f18:441a:8902:33d7:d6ea:46f5:a181
+
+This is network metadata, not a credential. The deployment workflow substitutes it into the temporary Worker build only.
