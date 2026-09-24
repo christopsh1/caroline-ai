@@ -1,4 +1,4 @@
-FROM docker/mcp-gateway:latest
+FROM docker/mcp-gateway@sha256:f5a679a05fc39022a046167bef92aeeb01bcd59485ad27843ae5227db7950688
 
 EXPOSE 8811
 
