@@ -10,6 +10,7 @@ from .errors import ArchiveError
 from .exporter import r2_client_from_env, stage_export, upload_staged
 from .manifest import load_schema, manifest_digest, validate_manifest
 from .checksum import sha256_file
+from .keys import new_ulid
 from .policy import (
     DERIVED_VIEWS,
     IN_SCOPE_RELATIONS,
@@ -150,11 +151,18 @@ def main(argv: list[str] | None = None) -> int:
         relations = _require_relations(args.relation)
         db_url = os.environ.get("SUPABASE_DB_URL", "")
         source = ReadOnlySupabaseSource(db_url)
-        staged = [stage_export(source, relation, args.output_dir, parquet=args.parquet) for relation in relations]
+
+        # One immutable export ID identifies the complete multi-relation archive run.
+        run_export_id = new_ulid()
+        staged = [
+            stage_export(source, relation, args.output_dir, export_id=run_export_id, parquet=args.parquet)
+            for relation in relations
+        ]
 
         if args.dry_run:
             print(json.dumps({
                 "mode": "dry-run",
+                "export_id": run_export_id,
                 "staged": [
                     {"relation": x.relation, "export_id": x.export_id, "bucket": x.bucket, "prefix": x.prefix, "manifest": str(x.manifest_path)}
                     for x in staged
@@ -167,7 +175,7 @@ def main(argv: list[str] | None = None) -> int:
         # This branch can only be reached via the exact explicit confirmation mode.
         client = r2_client_from_env(confirmed=True)
         results = [upload_staged(item, client) for item in staged]
-        print(json.dumps({"mode": "archive-write", "results": results, "r2_writes": True, "supabase_writes": False}, indent=2))
+        print(json.dumps({"mode": "archive-write", "export_id": run_export_id, "results": results, "r2_writes": True, "supabase_writes": False}, indent=2))
         return 0
     except ArchiveError as exc:
         print(exc.code, file=sys.stderr)
