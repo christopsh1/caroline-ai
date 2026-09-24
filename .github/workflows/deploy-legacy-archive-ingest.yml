@@ -1,0 +1,41 @@
+name: Deploy temporary legacy archive ingest
+
+on:
+  push:
+    branches:
+      - archive/legacy-supabase-r2-extractor
+    paths:
+      - 'cloudflare/legacy_archive_ingest/**'
+      - '.github/workflows/deploy-legacy-archive-ingest.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        working-directory: cloudflare/legacy_archive_ingest
+        run: npm install --no-audit --no-fund
+
+      - name: Validate isolated maintenance Worker
+        working-directory: cloudflare/legacy_archive_ingest
+        run: npm run check
+
+      - name: Deploy isolated maintenance Worker
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: '882fc7501e4632c7c58879d5c1d5b672'
+          workingDirectory: cloudflare/legacy_archive_ingest
+          command: deploy
