@@ -12,7 +12,7 @@ Fresh standalone Cloudflare Worker configuration for Caroline event ingestion an
 - D1 `CAROLINE_DB` → `e350a176-c2be-4b5c-9975-bebb157e944a`
 - Queue `EVENT_DELIVERY` → `caroline-event-delivery`
 
-The event API currently stores event state in KV and sends only an event pointer to the queue. The queue consumer marks the stored event as delivered.
+The event API stores event state in KV and sends only an event pointer to the queue. The queue consumer updates delivery state and can optionally forward each event to a Supabase Edge Function for downstream processing.
 
 ## Endpoints
 
@@ -27,16 +27,24 @@ curl https://caroline-event-worker.customerservice-882.workers.dev/health
 ```bash
 curl -X POST https://caroline-event-worker.customerservice-882.workers.dev/events \
   -H "Content-Type: application/json" \
+  -H "x-caroline-key: <runtime key>" \
   -d '{"type":"order.created","payload":{"order_id":"12345","customer":"Caroline"}}'
 ```
 
 ### Retrieve an event
 
 ```bash
-curl https://caroline-event-worker.customerservice-882.workers.dev/events/<event_id>
+curl https://caroline-event-worker.customerservice-882.workers.dev/events/<event_id> \
+  -H "x-caroline-key: <runtime key>"
 ```
 
-After the queue consumer runs, the event should report `status: "delivered"`.
+After the queue consumer runs, the event should report `status: "delivered"`. If downstream delivery is failing, it reports `status: "delivery_retrying"` with `last_delivery_error`.
+
+## Request contract
+
+- Runtime auth is required on `/events` and `/events/<event_id>` using `x-caroline-key`.
+- Event `type` must be a non-empty string (max 120 chars) containing only letters, numbers, `.`, `_`, `:`, or `-`.
+- Body must be a JSON object.
 
 ## Local validation
 
@@ -60,6 +68,11 @@ Runtime secret names:
 - `ELEVENLABS_WEBHOOK_SECRET`
 - `TWILIO_AUTH_TOKEN`
 - `OPEN_ROUTER_KEY`
+- `SUPABASE_EVENT_INGEST_KEY` (optional override key used for downstream ingest calls)
+
+Runtime variable names:
+
+- `SUPABASE_EVENT_INGEST_URL` (optional downstream ingest endpoint)
 
 Deployment credentials:
 
@@ -68,4 +81,4 @@ Deployment credentials:
 
 ## Security note
 
-The current `/events` test contract is intentionally unauthenticated to match the existing smoke-test interface. Do not send sensitive payloads to it until request authentication is added to this fresh Worker path.
+`/events` is now runtime-key protected. Keep runtime keys in Cloudflare secrets only and never commit values to this repository.
