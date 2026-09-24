@@ -1,0 +1,237 @@
+name: Finalize completed legacy Supabase archive
+
+on:
+  push:
+    branches:
+      - archive/legacy-supabase-r2-extractor
+    paths:
+      - '.github/workflows/finalize-legacy-archive.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-close:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: '882fc7501e4632c7c58879d5c1d5b672'
+      RUN_ID: '01M3A2HCA9BFSK5PB5MF26EFKE'
+      PROJECT_REF: 'drsyygxqwxuyoyjbsaqs'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install Wrangler
+        working-directory: cloudflare/legacy_archive_ingest
+        run: npm install --no-audit --no-fund
+
+      - name: Independently validate all 26 manifests and referenced R2 objects
+        working-directory: cloudflare/legacy_archive_ingest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import copy, gzip, hashlib, json, os, subprocess
+          from pathlib import Path
+
+          RUN = os.environ['RUN_ID']
+          PROJECT = os.environ['PROJECT_REF']
+          wrangler = Path('node_modules/.bin/wrangler').resolve()
+          root = Path('.archive-finalize')
+          root.mkdir(exist_ok=False)
+
+          expected = {
+            'agent_creator_runs': ('caroline-events-raw','events',4),
+            'agent_improvements': ('caroline-events-raw','events',5),
+            'agent_runs': ('caroline-events-raw','events',9),
+            'airtable_sync_jobs': ('caroline-events-raw','events',138),
+            'availability_state': ('caroline-artifacts','reference',1),
+            'brain_turn_metrics': ('caroline-events-raw','events',16),
+            'calendar_events': ('caroline-artifacts','reference',0),
+            'calendar_shares': ('caroline-artifacts','reference',0),
+            'call_answering_restrictions': ('caroline-artifacts','reference',0),
+            'call_history': ('caroline-transcripts','communications',53),
+            'call_turns': ('caroline-transcripts','communications',99),
+            'commitments': ('caroline-artifacts','reference',0),
+            'contact_card_details': ('caroline-artifacts','reference',1),
+            'contact_card_field_provenance': ('caroline-artifacts','reference',0),
+            'contact_mentions': ('caroline-artifacts','reference',0),
+            'contact_permissions': ('caroline-artifacts','reference',6),
+            'contacts': ('caroline-artifacts','reference',5),
+            'events_processed': ('caroline-events-raw','events',59),
+            'instructions': ('caroline-artifacts','reference',1),
+            'phone_admission_events': ('caroline-events-raw','events',7),
+            'project_contacts': ('caroline-artifacts','reference',0),
+            'projects': ('caroline-artifacts','reference',0),
+            'relationships': ('caroline-artifacts','reference',0),
+            'scheduled_actions': ('caroline-events-raw','events',1),
+            'sms_history': ('caroline-transcripts','communications',0),
+            'transcript_ingestion_jobs': ('caroline-events-raw','events',53),
+          }
+          rag = {'documents','document_chunks','system_docs','corpus_health_log','interaction_chunks','agent_memory','memory_items','contact_profile_items','call_transcript_chunks'}
+          prohibited = {'vault.decrypted_secrets'}
+
+          def get_obj(bucket, key, dest):
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              subprocess.run([str(wrangler),'r2','object','get',f'{bucket}/{key}','--file',str(dest),'--remote'], check=True)
+
+          def file_sha(path):
+              h=hashlib.sha256()
+              with path.open('rb') as f:
+                  for chunk in iter(lambda:f.read(1024*1024), b''):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          entries=[]
+          total=0
+          for rel,(bucket,category,count) in expected.items():
+              prefix=f'supabase/{PROJECT}/{category}/{rel}/export={RUN}'
+              mf=root/'manifests'/f'{rel}.json'
+              get_obj(bucket,f'{prefix}/manifest.json',mf)
+              m=json.loads(mf.read_text())
+              assert m['manifest_version']=='caroline.archive.v1'
+              assert m['export_id']==RUN
+              assert m['source']['project_ref']==PROJECT
+              assert m['source']['relation']==rel
+              assert m['dataset']['row_count']==count
+              assert m['integrity']['readback_verified'] is True
+              assert m['redaction']['secret_scan_passed'] is True
+              assert rag.issubset(set(m['redaction']['prohibited_sources_checked']))
+              assert prohibited.issubset(set(m['redaction']['prohibited_sources_checked']))
+              assert m['runtime_policy']=={
+                  'production_system_of_record':False,
+                  'runtime_reads_allowed':False,
+                  'rag_direct_reads_allowed':False,
+                  'restore_requires_owner_approval':True,
+              }
+              clone=copy.deepcopy(m)
+              clone['integrity']['manifest_sha256']='sha256:'+'0'*64
+              canonical=json.dumps(clone,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()
+              assert 'sha256:'+hashlib.sha256(canonical).hexdigest()==m['integrity']['manifest_sha256']
+
+              verified=[]
+              data_rows=None
+              for i,obj in enumerate(m['objects']):
+                  local=root/'objects'/rel/f'{i}-{Path(obj["key"]).name}'
+                  get_obj(obj['bucket'],obj['key'],local)
+                  assert local.stat().st_size==obj['size_bytes']
+                  assert 'sha256:'+file_sha(local)==obj['sha256']
+                  if obj['format']=='jsonl':
+                      with gzip.open(local,'rt',encoding='utf-8') as fh:
+                          lines=sum(1 for line in fh if line.strip())
+                      assert lines==obj['row_count']==count
+                      data_rows=lines
+                  verified.append({'bucket':obj['bucket'],'key':obj['key'],'sha256':obj['sha256'],'size_bytes':obj['size_bytes']})
+              assert data_rows==count
+              total += count
+              entries.append({
+                  'relation':rel,
+                  'bucket':bucket,
+                  'manifest_key':f'{prefix}/manifest.json',
+                  'row_count':count,
+                  'manifest_sha256':m['integrity']['manifest_sha256'],
+                  'manifest_object_sha256':'sha256:'+file_sha(mf),
+                  'objects':verified,
+              })
+
+          assert len(entries)==26 and total==458
+          entries.sort(key=lambda x:x['relation'])
+          run_manifest={
+              'manifest_version':'caroline.archive-run.v1',
+              'run_id':RUN,
+              'source':{'provider':'supabase','project_ref':PROJECT},
+              'archive_purpose':'legacy_supabase_reference_only',
+              'relation_count':26,
+              'row_count':458,
+              'relations':entries,
+              'runtime_policy':{
+                  'production_system_of_record':False,
+                  'runtime_reads_allowed':False,
+                  'rag_direct_reads_allowed':False,
+                  'restore_requires_owner_approval':True,
+              },
+          }
+          validation={
+              'validation_version':'caroline.archive-validation.v1',
+              'run_id':RUN,
+              'status':'passed',
+              'relation_count':26,
+              'row_count':458,
+              'checks':{
+                  'all_relation_manifests_present':True,
+                  'all_manifest_internal_sha256_valid':True,
+                  'all_referenced_objects_re_downloaded':True,
+                  'all_referenced_object_size_sha256_valid':True,
+                  'all_jsonl_row_counts_match':True,
+                  'all_secret_scan_flags_passed':True,
+                  'all_rag_and_secret_denylists_present':True,
+                  'all_runtime_policies_archive_only':True,
+                  'single_run_id':True,
+              },
+              'source_mutation':False,
+              'rag_changed':False,
+              'archive_runtime_reads_allowed':False,
+              'temporary_transport':'cloudflare_worker_bound_to_existing_private_r2_buckets',
+          }
+          (root/'run-manifest.json').write_text(json.dumps(run_manifest,sort_keys=True,indent=2)+'\n')
+          (root/'run-validation.json').write_text(json.dumps(validation,sort_keys=True,indent=2)+'\n')
+          print(json.dumps({'ok':True,'relations':26,'rows':458,'run_id':RUN},sort_keys=True))
+          PY
+
+      - name: Upload central run evidence create-only and verify read-back
+        working-directory: cloudflare/legacy_archive_ingest
+        shell: bash
+        run: |
+          set -euo pipefail
+          WR=./node_modules/.bin/wrangler
+          BASE="supabase/${PROJECT_REF}"
+          MANIFEST_KEY="${BASE}/manifests/${RUN_ID}/run-manifest.json"
+          VALIDATION_KEY="${BASE}/validation/${RUN_ID}/run-validation.json"
+          for spec in "${MANIFEST_KEY}:.archive-finalize/run-manifest.json" "${VALIDATION_KEY}:.archive-finalize/run-validation.json"; do
+            key=${spec%%:*}; file=${spec#*:}
+            if "$WR" r2 object get "caroline-artifacts/$key" --file .archive-finalize/collision-check.json --remote >/dev/null 2>&1; then
+              echo "IMMUTABLE_KEY_COLLISION: $key" >&2
+              exit 1
+            fi
+            "$WR" r2 object put "caroline-artifacts/$key" --file "$file" --remote --content-type application/json
+            "$WR" r2 object get "caroline-artifacts/$key" --file .archive-finalize/readback.json --remote
+            test "$(sha256sum "$file" | cut -d' ' -f1)" = "$(sha256sum .archive-finalize/readback.json | cut -d' ' -f1)"
+          done
+          echo "central_evidence_readback_verified=true"
+          echo "run_manifest_sha256=$(sha256sum .archive-finalize/run-manifest.json | cut -d' ' -f1)"
+          echo "run_validation_sha256=$(sha256sum .archive-finalize/run-validation.json | cut -d' ' -f1)"
+
+      - name: Remove temporary archive ingest Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          response=$(curl --fail-with-body --silent --show-error \
+            -X DELETE \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/caroline-legacy-archive-ingest")
+          if [ -n "$response" ]; then
+            echo "$response" | python3 -c 'import json,sys; x=json.load(sys.stdin); assert x.get("success") is True'
+          fi
+          echo "temporary_worker_deleted=true"
+
+      - name: Verify temporary Worker is no longer listed
+        shell: bash
+        run: |
+          set -euo pipefail
+          body=$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts")
+          BODY="$body" python3 - <<'PY'
+          import json,os
+          x=json.loads(os.environ['BODY'])
+          names={item.get('id') for item in (x.get('result') or [])}
+          assert 'caroline-legacy-archive-ingest' not in names
+          print('temporary_worker_absent=true')
+          PY
