@@ -28,6 +28,10 @@ jobs:
         working-directory: cloudflare/legacy_archive_ingest
         run: npm install --no-audit --no-fund
 
+      - name: Pin current Cloudflare-observed Supabase egress
+        working-directory: cloudflare/legacy_archive_ingest
+        run: sed -i "s/13.216.119.224/2600:1f18:441a:8902:33d7:d6ea:46f5:a181/" src/index.js
+
       - name: Validate isolated maintenance Worker
         working-directory: cloudflare/legacy_archive_ingest
         run: npm run check
