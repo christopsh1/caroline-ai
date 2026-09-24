@@ -1,34 +1,20 @@
-# Approved archive execution command
+# Completed archive execution record
 
-The 26-relation raw-export set and redaction policy are owner-approved.
+The owner-approved 26-relation legacy Supabase archive run has completed successfully.
 
-After runtime secrets are present, the required sequence is:
+Completed run ID:
 
-```bash
-cd tools/legacy-supabase-exporter
-python -m venv .venv
-. .venv/bin/activate
-pip install -e '.[dev]'
-caroline-archive --validate
-pytest
-bash scripts/run-approved-set.sh dry-run
-```
+`01M3A2HCA9BFSK5PB5MF26EFKE`
 
-Review the staged manifests and verify them locally. When the dry-run succeeds and the R2 runtime bindings are present, the approved write command is:
+Do **not** rerun or reuse that immutable run ID. Its R2 keys are intentionally collision-protected.
 
-```bash
-bash scripts/run-approved-set.sh write
-```
+Permanent exporter tooling remains under `tools/legacy-supabase-exporter/` for audit/reference or a separately approved future archive run. A future run must generate a new ULID and must continue to enforce the same RAG and secret-source exclusions.
 
-The write runner invokes the exporter only through `--confirm-archive-write` and uses the same approved 26-relation list.
+The completed run archived 458 rows across 26 approved relations and passed independent R2 re-download/hash/row-count validation.
 
-Required runtime bindings:
+Central evidence:
 
-```text
-SUPABASE_DB_URL
-R2_ENDPOINT_URL
-R2_ACCESS_KEY_ID
-R2_SECRET_ACCESS_KEY
-```
+- `caroline-artifacts/supabase/drsyygxqwxuyoyjbsaqs/manifests/01M3A2HCA9BFSK5PB5MF26EFKE/run-manifest.json`
+- `caroline-artifacts/supabase/drsyygxqwxuyoyjbsaqs/validation/01M3A2HCA9BFSK5PB5MF26EFKE/run-validation.json`
 
-Secret values must remain outside Git, chat, manifests, logs, and reports.
+No secret value belongs in Git, chat, manifests, logs, or reports.
