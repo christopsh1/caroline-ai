@@ -1,0 +1,39 @@
+name: Validate legacy Supabase exporter
+
+on:
+  pull_request:
+    paths:
+      - 'tools/legacy-supabase-exporter/**'
+      - 'docs/legacy-supabase/**'
+      - 'templates/legacy-extracted/**'
+      - '.github/workflows/validate-legacy-supabase-exporter.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safety-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/legacy-supabase-exporter
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: tools/legacy-supabase-exporter/pyproject.toml
+
+      - name: Install exporter and test dependencies
+        run: python -m pip install -e '.[dev]'
+
+      - name: Validate static policy and manifest schema
+        run: caroline-archive --validate
+
+      - name: Run safety tests
+        run: pytest

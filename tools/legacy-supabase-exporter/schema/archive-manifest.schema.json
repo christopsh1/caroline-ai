@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://caroline.local/schema/archive-manifest.schema.json",
+  "title": "Caroline Legacy Archive Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifest_version", "export_id", "archive_purpose", "created_at", "created_by", "source", "classification", "redaction", "dataset", "objects", "integrity", "runtime_policy"],
+  "properties": {
+    "manifest_version": {"const": "caroline.archive.v1"},
+    "export_id": {"type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"},
+    "archive_purpose": {"const": "legacy_supabase_reference_only"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "created_by": {"type": "string", "minLength": 1},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["provider", "project_ref", "schema", "relation", "relation_type", "source_schema_fingerprint", "extraction_method", "source_query_redacted", "watermark"],
+      "properties": {
+        "provider": {"const": "supabase"},
+        "project_ref": {"const": "drsyygxqwxuyoyjbsaqs"},
+        "schema": {"const": "public"},
+        "relation": {"type": "string"},
+        "relation_type": {"enum": ["table", "view", "schema", "artifact"]},
+        "source_schema_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "extraction_method": {"const": "repeatable_read_allowlisted_export"},
+        "source_query_redacted": {"type": "string"},
+        "watermark": {
+          "type": "object", "additionalProperties": false,
+          "required": ["column", "from_exclusive", "through_inclusive"],
+          "properties": {
+            "column": {"type": ["string", "null"]},
+            "from_exclusive": {"type": ["string", "null"]},
+            "through_inclusive": {"type": ["string", "null"]}
+          }
+        }
+      }
+    },
+    "classification": {
+      "type": "object", "additionalProperties": false,
+      "required": ["archive_category", "sensitivity", "contains_pii", "contains_communications", "contains_prompt_text", "contains_provider_identifiers", "contains_credentials", "contains_secret_references", "template_relevance"],
+      "properties": {
+        "archive_category": {"enum": ["reference", "event", "transcript", "artifact", "media"]},
+        "sensitivity": {"enum": ["internal", "confidential", "restricted"]},
+        "contains_pii": {"type": "boolean"},
+        "contains_communications": {"type": "boolean"},
+        "contains_prompt_text": {"type": "boolean"},
+        "contains_provider_identifiers": {"type": "boolean"},
+        "contains_credentials": {"const": false},
+        "contains_secret_references": {"type": "boolean"},
+        "template_relevance": {"enum": ["none", "low", "medium", "high"]}
+      }
+    },
+    "redaction": {
+      "type": "object", "additionalProperties": false,
+      "required": ["performed", "policy_version", "removed_columns", "transformed_columns", "secret_scan_passed", "prohibited_sources_checked"],
+      "properties": {
+        "performed": {"type": "boolean"},
+        "policy_version": {"const": "caroline.export-redaction.v1"},
+        "removed_columns": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "transformed_columns": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "secret_scan_passed": {"type": "boolean"},
+        "prohibited_sources_checked": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "dataset": {
+      "type": "object", "additionalProperties": false,
+      "required": ["row_count", "primary_key_columns", "primary_key_checksum_algorithm", "primary_key_checksum"],
+      "properties": {
+        "row_count": {"type": "integer", "minimum": 0},
+        "primary_key_columns": {"type": "array", "items": {"type": "string"}},
+        "primary_key_checksum_algorithm": {"const": "sha256"},
+        "primary_key_checksum": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "objects": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["bucket", "key", "format", "compression", "size_bytes", "sha256", "row_count"],
+        "properties": {
+          "bucket": {"enum": ["caroline-artifacts", "caroline-events-raw", "caroline-media", "caroline-transcripts"]},
+          "key": {"type": "string", "minLength": 1},
+          "format": {"enum": ["jsonl", "parquet", "json"]},
+          "compression": {"enum": ["gzip", "zstd", "none"]},
+          "size_bytes": {"type": "integer", "minimum": 0},
+          "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "row_count": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "integrity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["manifest_sha256", "readback_verified", "restore_test_status", "restore_test_report_key"],
+      "properties": {
+        "manifest_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "readback_verified": {"type": "boolean"},
+        "restore_test_status": {"enum": ["pending", "planned", "passed", "failed"]},
+        "restore_test_report_key": {"type": ["string", "null"]}
+      }
+    },
+    "runtime_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["production_system_of_record", "runtime_reads_allowed", "rag_direct_reads_allowed", "restore_requires_owner_approval"],
+      "properties": {
+        "production_system_of_record": {"const": false},
+        "runtime_reads_allowed": {"const": false},
+        "rag_direct_reads_allowed": {"const": false},
+        "restore_requires_owner_approval": {"const": true}
+      }
+    }
+  }
+}
