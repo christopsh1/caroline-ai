@@ -1,43 +1,50 @@
 # Caroline AI
 
-This repository is the source-controlled baseline of the Caroline production system.
+This repository is a historical/source snapshot for Caroline components that still use it. It is not the deployment authority for Caroline Phone.
 
-## Initial authority model
+## Caroline Phone operations exception
 
-- ElevenLabs and Supabase production remain authoritative for this initial import.
-- The baseline is observational: no production configuration, schema, data, or deployment was changed.
+`caroline-phone` is explicitly managed outside repository-hosted deployment automation.
+
+- The live Worker is managed directly in Cloudflare.
+- Deployment is through Cloudflare Dashboard/Quick Edit or a standalone local Wrangler copy.
+- Cloudflare Worker Secrets and dashboard-managed bindings/variables are authoritative for the Worker runtime.
+- Twilio Console, ElevenLabs dashboard/API, and the database provider remain authoritative for their respective production configuration.
+- No push, branch, pull request, hosted CI workflow, repository secret, or repository-connected Cloudflare Build is part of the Caroline Phone deployment path.
+- Standalone Caroline Phone source backups should be stored outside any Git working tree and must not contain secret values.
+
+The copy under `cloudflare/caroline_phone/` is transitional/reference material only and must not be treated as an automatic production source.
+
+## Initial authority model for legacy snapshot material
+
+- ElevenLabs and Supabase production remain authoritative for the original import.
+- The baseline is observational unless a component-specific runbook explicitly states otherwise.
 - Runtime table rows, conversation transcripts, call recordings, and secret values are intentionally excluded.
-- Secret references and environment-variable names are retained where needed to preserve deployable configuration.
+- Secret references and environment-variable names are retained where needed for documentation.
 
 ## Snapshot contents
 
-- `elevenlabs/agent.json` — live Caroline agent configuration.
-- `elevenlabs/branches.json` — branch inventory and live traffic allocation.
-- `elevenlabs/tools/` — workspace tool definitions used by Caroline.
-- `elevenlabs/knowledge/` — attached knowledge-base documents.
-- `elevenlabs/procedures/` — live main-branch procedures.
-- `elevenlabs/tests/` — 145 ElevenLabs test definitions and their paginated index.
-- `supabase/functions/` — source for all 28 active Edge Functions.
-- `supabase/catalog/` — schema, migration, extension, policy, trigger, index, view, and function metadata.
-- `supabase/types/database.types.ts` — generated TypeScript database types.
+- `elevenlabs/agent.json` — historical Caroline agent snapshot.
+- `elevenlabs/branches.json` — historical branch inventory and traffic allocation snapshot.
+- `elevenlabs/tools/` — historical workspace tool definitions.
+- `elevenlabs/knowledge/` — historical knowledge-base snapshot.
+- `elevenlabs/procedures/` — historical procedure snapshot.
+- `elevenlabs/tests/` — historical ElevenLabs test snapshot.
+- `supabase/functions/` — legacy Edge Function source snapshot.
+- `supabase/catalog/` — legacy schema and metadata snapshot.
+- `supabase/types/database.types.ts` — generated TypeScript database types snapshot.
 
 ## Production identifiers
 
-- ElevenLabs agent: `agent_8001m2ba4rmder6t7wq270ntj43j`
-- ElevenLabs live branch: `agtbrch_0301m2ba4v10exarksax30ye678x` (Main, 100% live)
-- Supabase project: `drsyygxqwxuyoyjbsaqs` (Caroline)
-- Snapshot date: `2026-09-18` UTC
+- ElevenLabs inbound agent: `agent_8001m2ba4rmder6t7wq270ntj43j`
+- ElevenLabs inbound Main branch: `agtbrch_0301m2ba4v10exarksax30ye678x`
+- Supabase project: `drsyygxqwxuyoyjbsaqs`
+- Original snapshot date: `2026-09-18` UTC
 
 ## Safety
 
-Do not apply files from this repository to production automatically. Stabilization work should occur on explicit non-production branches and be reviewed before any promotion.
+Do not automatically apply snapshot files to production. For Caroline Phone specifically, follow `cloudflare/caroline_phone/README.md` and use direct Cloudflare deployment only.
 
 ## Cloudflare MCP
 
-The repository connects MCP-compatible clients to Cloudflare's full API server through
-the project-level [`.mcp.json`](.mcp.json) configuration. The server uses Cloudflare
-OAuth, so each developer must complete the browser authorization flow presented by
-their MCP client; no API token or account credential is stored in this repository.
-
-Restart or reload the MCP client after cloning, then enable the `cloudflare` server.
-Access remains limited to the accounts, zones, and permissions granted during OAuth.
+The project-level `.mcp.json` remains a development convenience for other Caroline work. It is not part of the Caroline Phone production runtime or deployment path.
