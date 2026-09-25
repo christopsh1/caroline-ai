@@ -1,5 +1,5 @@
 import { appendFileSync } from "node:fs";
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 
 const env = process.env;
 const checkOnly = process.argv.includes("--check");
@@ -200,13 +200,21 @@ if (auth.kind === "bearer") {
   exportEnv("CLOUDFLARE_EMAIL", auth.email);
 }
 
-let gatewayToken = nonempty(env.MCP_GATEWAY_TOKEN);
+let gatewayToken = nonempty(env.MCP_GATEWAY_TOKEN) ?? nonempty(env.GITHUB_FALLBACK_MCP_GATEWAY_TOKEN);
 if (!gatewayToken) {
-  gatewayToken = randomBytes(48).toString("base64url");
+  const seed = auth.kind === "bearer" ? auth.token : auth.key;
+  gatewayToken = createHmac("sha256", seed)
+    .update("caroline-mcp-gateway-token/v1", "utf8")
+    .digest("base64url");
   mask(gatewayToken);
-  await persistGatewayToken(gatewayToken);
-  console.log("Generated MCP gateway bearer token and stored it in Infisical.");
+
+  try {
+    await persistGatewayToken(gatewayToken);
+    console.log("Generated MCP gateway bearer token and stored it in Infisical.");
+  } catch (error) {
+    console.log(`Infisical token persistence is unavailable; using stable derived gateway token for this deployment (${error instanceof Error ? error.message : "unknown error"}).`);
+  }
 } else {
-  console.log("Using existing MCP gateway bearer token from Infisical.");
+  console.log("Using existing MCP gateway bearer token.");
 }
 exportEnv("MCP_GATEWAY_TOKEN", gatewayToken);
