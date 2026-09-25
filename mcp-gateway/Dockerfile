@@ -1,16 +1,9 @@
-FROM python:3.12-slim
+FROM ghcr.io/cociweb/mcp-gateway:latest
 
-ENV PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    MCP_GWAY_ALLOW_REMOTE=1
+COPY config/mcpServers.json /app/config/mcpServers.json
 
-WORKDIR /app
-
-RUN pip install --no-cache-dir "mcp-gway==1.4.2"
-
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+ENV MCP_SERVERS_CONFIG=/app/config/mcpServers.json
 
 EXPOSE 8811
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["sh", "-c", "export GATEWAY_PORT=${PORT:-8811}; exec python -m gateway.main"]
