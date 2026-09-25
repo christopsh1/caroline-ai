@@ -1,0 +1,9 @@
+name = "caroline-mcp"
+main = "src/index.ts"
+compatibility_date = "2026-09-24"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[vars]
+ENVIRONMENT = "staging"
+CLOUDFLARE_MCP_URL = "https://mcp.cloudflare.com/mcp"
