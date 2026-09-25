@@ -1,29 +1,142 @@
-# Caroline Phone Control Worker
+# Caroline Phone
 
-This package implements the phone architecture exactly as defined for the current build:
+Caroline Phone is a Cloudflare Worker that orchestrates Twilio telephony around ElevenLabs. ElevenLabs is the sole live conversational-agent and LLM runtime.
 
-- Cloudflare is the telephony control layer.
-- Twilio remains the PSTN carrier/router.
-- ElevenLabs remains the conversational runtime through server-side `POST /v1/convai/twilio/register-call`.
-- Active-call truth is persisted per `CallSid` in a SQLite-backed Durable Object.
-- KV is not used for identity, permissions, bans, revocation, or active-call truth.
-- Supabase is not a runtime dependency.
-- Neon is the future canonical backend and is represented only by the explicit pending boundary in `src/canonical.ts`.
-- The standalone `cloudflare/` event worker is separate and must remain untouched.
+## Runtime architecture
 
-## Routes
+```text
+Inbound caller
+  -> Twilio
+  -> caroline-phone Worker
+  -> ElevenLabs Register Call API
+  -> ElevenLabs-native Caroline agent + ElevenLabs-native LLM
+  <-> ElevenLabs Webhook Tools
+  <-> caroline-phone Worker
+  <-> approved database / CRM / RAG / scheduling backends
 
-All `/twilio/*` routes are POST-only and verify `X-Twilio-Signature` against the exact public request URL and form parameters.
+Call ends
+  -> ElevenLabs post-call webhook
+  -> caroline-phone Worker
+  -> post-call Queue
+  -> summaries / memory / CRM / analytics workers
+```
 
-- `POST /twilio/inbound` — inbound PSTN call. AMD is off. Registers the call with ElevenLabs using `direction=inbound` and returns ElevenLabs TwiML directly to Twilio.
-- `POST /twilio/outbound` — Twilio's webhook for an already-created outbound PSTN leg. Registers with ElevenLabs using `direction=outbound` and returns ElevenLabs TwiML.
-- `POST /twilio/status` — persists lifecycle status to the per-call Durable Object.
-- `POST /twilio/amd` — persists asynchronous answering-machine detection result to the per-call Durable Object.
-- `GET /health` — non-Twilio health endpoint.
+Outbound calls follow the same live conversation boundary:
 
-## Outbound Twilio call creation contract
+```text
+authorized backend/admin trigger
+  -> caroline-phone
+  -> Twilio outbound call
+  -> /twilio/outbound
+  -> ElevenLabs Register Call API
+  -> ElevenLabs-native outbound Caroline agent + native LLM
+```
 
-The component that creates an outbound Twilio Call must use these settings:
+Cloudflare never proxies chat completions for a live call. There is intentionally no `/v1/chat/completions` route and no OpenRouter dependency in this package.
+
+## ElevenLabs agents
+
+- Inbound: `agent_8001m2ba4rmder6t7wq270ntj43j`
+- Outbound: `agent_0501m31c1xv6e40ayeab7bn67vet`
+
+Both agents must use an ElevenLabs-supported native LLM. Do not configure a Custom LLM URL, provider API key, or OpenAI-compatible model endpoint on either agent.
+
+## Worker routes
+
+Twilio routes:
+
+- `POST /twilio/inbound`
+- `POST /twilio/outbound`
+- `POST /twilio/status`
+- `POST /twilio/amd`
+
+ElevenLabs tool routes:
+
+- `POST /elevenlabs/tools/customer-lookup`
+- `POST /elevenlabs/tools/search-knowledge`
+- `POST /elevenlabs/tools/get-availability`
+- `POST /elevenlabs/tools/prepare-action`
+- `POST /elevenlabs/tools/commit-action`
+- `POST /elevenlabs/tools/transfer`
+
+Post-call:
+
+- `POST /elevenlabs/webhooks/post-call`
+
+Health:
+
+- `GET /health`
+
+## Call-context boundary
+
+At call registration the Worker generates an opaque `call_context_id` and stores the server-side mapping between that ID, Twilio `CallSid`, direction, selected agent, lifecycle state and expiry.
+
+Only this value is passed to ElevenLabs at call start:
+
+```json
+{
+  "call_context_id": "opaque-id"
+}
+```
+
+Do not place raw database rows, credentials, verification secrets, complete history, caller permissions or protected customer data in dynamic variables. Caller ID is a lookup hint, not proof of identity.
+
+## Security
+
+Twilio endpoints verify the exact `X-Twilio-Signature` before processing form data.
+
+ElevenLabs tool routes require a Worker-held `ELEVENLABS_TOOL_SECRET`. The current backend adapter is deliberately fail-closed: protected lookup/action routes return `backend_not_configured` until an approved backend adapter is attached. The customer-lookup scaffold returns only non-sensitive verification state and never echoes the caller's phone number.
+
+Post-call webhooks verify `ElevenLabs-Signature` using HMAC-SHA256 over `timestamp.raw_body`, reject stale signatures, claim a deterministic event ID for idempotency, and enqueue only after successful verification. If the post-call queue is not configured, the route returns a retryable error instead of silently dropping the event.
+
+Write actions must eventually use `prepare-action` followed by `commit-action` with a short-lived server-issued confirmation token. Until that backend implementation exists, both routes remain fail-closed.
+
+## Required Worker secrets
+
+Configure these only in Cloudflare Worker Secrets:
+
+- `TWILIO_AUTH_TOKEN`
+- `ELEVENLABS_API_KEY`
+- `ELEVENLABS_TOOL_SECRET`
+- `ELEVENLABS_WEBHOOK_SECRET`
+
+Do not expose those values in prompts, dynamic variables, tool output, browser code, logs, local source files or documentation.
+
+No OpenRouter secret is required by Caroline Phone.
+
+## Direct deployment only
+
+Caroline Phone has no Git-based deployment or validation workflow. Do not connect it to a hosted source repository or repository-triggered Cloudflare build.
+
+### Cloudflare Dashboard
+
+Use Workers & Pages -> `caroline-phone` -> Edit Code / Quick Edit for direct code changes when appropriate. Manage bindings, variables and secrets in the Worker settings. Preserve the existing Worker name, routes, Durable Objects and production secrets.
+
+### Local Wrangler
+
+From a standalone local copy of this folder that is not inside a Git working tree:
+
+```bash
+npm install
+npm run check
+npx wrangler deploy --dry-run
+npx wrangler deploy
+```
+
+Authenticate Wrangler locally or use the Cloudflare login flow. Do not store account tokens inside the project folder.
+
+Secrets can be set directly:
+
+```bash
+npx wrangler secret put TWILIO_AUTH_TOKEN
+npx wrangler secret put ELEVENLABS_API_KEY
+npx wrangler secret put ELEVENLABS_TOOL_SECRET
+npx wrangler secret put ELEVENLABS_WEBHOOK_SECRET
+```
+
+## Outbound Twilio settings
+
+The component creating an outbound Twilio call should use:
 
 - `Url = https://<caroline-phone-host>/twilio/outbound`
 - `Method = POST`
@@ -33,38 +146,15 @@ The component that creates an outbound Twilio Call must use these settings:
 - `AsyncAmdStatusCallbackMethod = POST`
 - `StatusCallback = https://<caroline-phone-host>/twilio/status`
 - `StatusCallbackEvent = initiated, ringing, answered, completed`
-- Recording remains off unless a separate approved decision changes it.
 
-Inbound calls do not enable AMD.
+Inbound does not use AMD. Recording remains off unless separately approved.
 
-## ElevenLabs test target
+## Post-call queue
 
-Register-call currently pins conversation initiation to the existing non-live `cloudflare-refactor` agent branch. That branch already uses the native ElevenLabs model and has the old Supabase initiation fetch disabled. Main is not changed by this package.
+`EVENT_LEDGER` provides idempotency for verified ElevenLabs events. `POST_CALL_QUEUE` is intentionally not bound until a dedicated post-call consumer exists. Do not point it at the existing generic event-delivery consumer because that consumer does not yet perform transcript, memory, CRM or analytics work.
 
-The register-call payload includes the full set of dynamic-variable keys currently defined by that branch, but only compact scalar/default values. There is no large history or RAG payload at call start. Canonical identity, permissions, relationships, admission/ban state, memory/RAG context, availability, and outbound briefs remain pending Neon integration.
+When the dedicated consumer is ready, add a producer binding named `POST_CALL_QUEUE` in Cloudflare and keep the heavy work out of the webhook request path.
 
-Because canonical admission data is not built yet, this package is not a claim of full ban/owner/contact parity. That is a production-cutover parity gate, not something to fake with KV or D1.
+## Local backup policy
 
-## Required secrets
-
-Cloudflare Worker secrets:
-
-- `TWILIO_AUTH_TOKEN`
-- `ELEVENLABS_API_KEY`
-
-Non-secret Worker vars in `wrangler.toml` select the Caroline agent and the non-live Cloudflare refactor branch used for testing.
-
-## Validation and cutover order
-
-1. Typecheck and run synthetic tests.
-2. Dry-run Wrangler config.
-3. Deploy `caroline-phone` with required secrets; do not change the Twilio number yet.
-4. Verify signed synthetic/integration requests for inbound, outbound, status, AMD, and ElevenLabs register-call/TwiML.
-5. Close canonical admission/context parity required for production (Neon boundary).
-6. Point the Twilio inbound webhook to `/twilio/inbound`.
-7. Verify live routing.
-8. Only then remove the native ElevenLabs phone-number path.
-
-## Known ElevenLabs register-call limitation
-
-ElevenLabs documents that the advanced register-call integration does not provide its native call-transfer capability. This package does not redesign around that limitation; it is simply recorded as an explicit architectural tradeoff for later discussion if call transfer becomes a requirement.
+Keep periodic standalone archives of the `caroline_phone` folder outside any Git working tree. Include source, tests, `wrangler.toml`, `package.json` and this runbook. Never include secret values in backups.
