@@ -30,8 +30,10 @@ function makeEnv(binding: ReturnType<typeof makeDoBinding>['binding']): Env {
   return {
     TWILIO_AUTH_TOKEN: TWILIO_TOKEN,
     ELEVENLABS_API_KEY: 'test-elevenlabs-key',
-    ELEVENLABS_AGENT_ID: 'agent_test',
-    ELEVENLABS_BRANCH_ID: 'agtbrch_cloudflare_refactor',
+    ELEVENLABS_INBOUND_AGENT_ID: 'agent_inbound',
+    ELEVENLABS_INBOUND_BRANCH_ID: 'agtbrch_inbound_main',
+    ELEVENLABS_OUTBOUND_AGENT_ID: 'agent_outbound',
+    ELEVENLABS_OUTBOUND_BRANCH_ID: 'agtbrch_outbound_main',
     CALL_SESSION: binding,
   }
 }
@@ -76,7 +78,7 @@ test('rejects an unsigned Twilio route before state or ElevenLabs work', async (
   assert.equal(store.patches.length, 0)
 })
 
-test('inbound verifies Twilio, registers with ElevenLabs, uses refactor branch, and persists state', async () => {
+test('inbound verifies Twilio, registers with the inbound ElevenLabs runtime, and persists state', async () => {
   const store = makeDoBinding()
   const previousFetch = globalThis.fetch
   let registerBody: any = null
@@ -95,7 +97,8 @@ test('inbound verifies Twilio, registers with ElevenLabs, uses refactor branch, 
     assert.equal(response.status, 200)
     assert.equal(await response.text(), TWIML)
     assert.equal(registerBody.direction, 'inbound')
-    assert.equal(registerBody.conversation_initiation_client_data.branch_id, 'agtbrch_cloudflare_refactor')
+    assert.equal(registerBody.agent_id, 'agent_inbound')
+    assert.equal(registerBody.conversation_initiation_client_data.branch_id, 'agtbrch_inbound_main')
     const vars = registerBody.conversation_initiation_client_data.dynamic_variables
     assert.equal(vars.caller_access_tier, 'tier_0_unknown_unverified')
     assert.equal(vars.caller_identity_status, 'unknown')
@@ -108,12 +111,12 @@ test('inbound verifies Twilio, registers with ElevenLabs, uses refactor branch, 
   }
 })
 
-test('outbound registers direction=outbound', async () => {
+test('outbound registers with the dedicated outbound ElevenLabs runtime', async () => {
   const store = makeDoBinding()
   const previousFetch = globalThis.fetch
-  let direction = ''
+  let registerBody: any = null
   globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
-    direction = JSON.parse(String(init?.body ?? '{}')).direction
+    registerBody = JSON.parse(String(init?.body ?? '{}'))
     return new Response(TWIML, { status: 200 })
   }) as typeof fetch
 
@@ -125,7 +128,9 @@ test('outbound registers direction=outbound', async () => {
     })
     const response = await worker.fetch(request, makeEnv(store.binding))
     assert.equal(response.status, 200)
-    assert.equal(direction, 'outbound')
+    assert.equal(registerBody.direction, 'outbound')
+    assert.equal(registerBody.agent_id, 'agent_outbound')
+    assert.equal(registerBody.conversation_initiation_client_data.branch_id, 'agtbrch_outbound_main')
   } finally {
     globalThis.fetch = previousFetch
   }
