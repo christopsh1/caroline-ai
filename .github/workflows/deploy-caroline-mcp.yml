@@ -119,3 +119,22 @@ jobs:
       - name: Provision caroline-mcp runtime secrets
         working-directory: services/caroline-mcp
         run: node scripts/runtime-secrets-json.mjs | npx wrangler secret bulk
+
+      - name: Verify live Caroline MCP health
+        shell: bash
+        run: |
+          set -euo pipefail
+          health_file="$(mktemp)"
+          curl --fail --silent --show-error --retry 8 --retry-delay 2 \
+            https://caroline-mcp.customerservice-882.workers.dev/health \
+            > "$health_file"
+          node - "$health_file" <<'NODE'
+          const fs = require('fs');
+          const path = process.argv[2];
+          const health = JSON.parse(fs.readFileSync(path, 'utf8'));
+          if (health.service !== 'caroline-mcp') throw new Error('unexpected service');
+          if (health.gateway_locked !== false) throw new Error('MCP gateway is locked');
+          if (health.workers_control_configured !== true) throw new Error('Workers control is not configured');
+          if (health.workers_builds_configured !== true) throw new Error('Workers Builds is not configured');
+          console.log(`caroline-mcp live health verified: version=${health.version}, environment=${health.environment}`);
+          NODE
