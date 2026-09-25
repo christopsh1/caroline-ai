@@ -1,4 +1,4 @@
-import type { CloudflareEnv } from "./cloudflare";
+import { cloudflareAuthHeaders, type CloudflareEnv } from "./cloudflare";
 
 export type CloudflareBuildsEnv = CloudflareEnv & {
   CLOUDFLARE_BUILDS_TOKEN?: string;
@@ -9,16 +9,11 @@ type RequestOptions = RequestInit & {
 };
 
 function requireBuilds(env: CloudflareBuildsEnv) {
-  if (!env.CLOUDFLARE_BUILDS_TOKEN) {
-    throw new Error("CLOUDFLARE_BUILDS_TOKEN is not configured");
-  }
   if (!env.CLOUDFLARE_ACCOUNT_ID) {
     throw new Error("CLOUDFLARE_ACCOUNT_ID is not configured");
   }
-  return {
-    token: env.CLOUDFLARE_BUILDS_TOKEN,
-    accountId: env.CLOUDFLARE_ACCOUNT_ID,
-  };
+  cloudflareAuthHeaders(env, env.CLOUDFLARE_BUILDS_TOKEN);
+  return { accountId: env.CLOUDFLARE_ACCOUNT_ID };
 }
 
 async function parseResponse(response: Response) {
@@ -45,7 +40,7 @@ async function buildsApi(
   path: string,
   options: RequestOptions = {},
 ) {
-  const { token, accountId } = requireBuilds(env);
+  const { accountId } = requireBuilds(env);
   const url = new URL(
     `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/builds${path}`,
   );
@@ -54,7 +49,8 @@ async function buildsApi(
   }
 
   const headers = new Headers(options.headers);
-  headers.set("Authorization", `Bearer ${token}`);
+  const auth = cloudflareAuthHeaders(env, env.CLOUDFLARE_BUILDS_TOKEN);
+  auth.forEach((value, key) => headers.set(key, value));
   headers.set("Accept", "application/json");
   if (options.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -68,7 +64,13 @@ async function buildsApi(
 }
 
 export function buildsConfigured(env: CloudflareBuildsEnv) {
-  return Boolean(env.CLOUDFLARE_BUILDS_TOKEN && env.CLOUDFLARE_ACCOUNT_ID);
+  const hasBearer = Boolean(
+    env.CLOUDFLARE_BUILDS_TOKEN || env.CLOUDFLARE_CONTROL_TOKEN || env.CLOUDFLARE_API_TOKEN,
+  );
+  const hasGlobalKey = Boolean(
+    env.CLOUDFLARE_API_KEY && (env.CLOUDFLARE_API_EMAIL || env.CLOUDFLARE_EMAIL),
+  );
+  return Boolean(env.CLOUDFLARE_ACCOUNT_ID && (hasBearer || hasGlobalKey));
 }
 
 export async function listBuilds(

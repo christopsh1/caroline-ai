@@ -1,5 +1,9 @@
 export type CloudflareEnv = {
   CLOUDFLARE_CONTROL_TOKEN?: string;
+  CLOUDFLARE_API_TOKEN?: string;
+  CLOUDFLARE_API_KEY?: string;
+  CLOUDFLARE_API_EMAIL?: string;
+  CLOUDFLARE_EMAIL?: string;
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_MCP_URL?: string;
 };
@@ -10,17 +14,29 @@ export type WorkerModule = {
   type?: "esm" | "commonjs" | "text" | "json" | "wasm" | "data";
 };
 
-function requireCloudflare(env: CloudflareEnv) {
-  if (!env.CLOUDFLARE_CONTROL_TOKEN) {
-    throw new Error("CLOUDFLARE_CONTROL_TOKEN is not configured");
+export function cloudflareAuthHeaders(env: CloudflareEnv, preferredToken?: string) {
+  const token = preferredToken ?? env.CLOUDFLARE_CONTROL_TOKEN ?? env.CLOUDFLARE_API_TOKEN;
+  if (token) {
+    return new Headers({ Authorization: `Bearer ${token}` });
   }
+
+  const email = env.CLOUDFLARE_API_EMAIL ?? env.CLOUDFLARE_EMAIL;
+  if (env.CLOUDFLARE_API_KEY && email) {
+    return new Headers({
+      "X-Auth-Email": email,
+      "X-Auth-Key": env.CLOUDFLARE_API_KEY,
+    });
+  }
+
+  throw new Error("Cloudflare credentials are not configured");
+}
+
+function requireCloudflare(env: CloudflareEnv) {
+  cloudflareAuthHeaders(env);
   if (!env.CLOUDFLARE_ACCOUNT_ID) {
     throw new Error("CLOUDFLARE_ACCOUNT_ID is not configured");
   }
-  return {
-    token: env.CLOUDFLARE_CONTROL_TOKEN,
-    accountId: env.CLOUDFLARE_ACCOUNT_ID,
-  };
+  return { accountId: env.CLOUDFLARE_ACCOUNT_ID };
 }
 
 async function parseResponse(response: Response) {
@@ -49,9 +65,10 @@ async function cloudflareApi(
   path: string,
   init: RequestInit = {},
 ) {
-  const { token } = requireCloudflare(env);
+  requireCloudflare(env);
   const headers = new Headers(init.headers);
-  headers.set("Authorization", `Bearer ${token}`);
+  const auth = cloudflareAuthHeaders(env);
+  auth.forEach((value, key) => headers.set(key, value));
   headers.set("Accept", headers.get("Accept") ?? "application/json");
 
   const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
@@ -76,16 +93,13 @@ export async function getWorkerSettings(env: CloudflareEnv, scriptName: string) 
 }
 
 export async function readWorkerCode(env: CloudflareEnv, scriptName: string) {
-  const { accountId, token } = requireCloudflare(env);
+  const { accountId } = requireCloudflare(env);
+  const headers = cloudflareAuthHeaders(env);
+  headers.set("Accept", "*/*");
+
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/workers/scripts/${encodeURIComponent(scriptName)}/content`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "*/*",
-      },
-    },
+    { method: "GET", headers },
   );
 
   const contentType = response.headers.get("content-type") ?? "";
@@ -127,7 +141,7 @@ export async function deployWorkerModules(
     bindings?: unknown[];
   },
 ) {
-  const { accountId, token } = requireCloudflare(env);
+  const { accountId } = requireCloudflare(env);
   if (!input.modules.length) {
     throw new Error("At least one Worker module is required");
   }
@@ -169,9 +183,7 @@ export async function deployWorkerModules(
     `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/workers/scripts/${encodeURIComponent(input.scriptName)}`,
     {
       method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: cloudflareAuthHeaders(env),
       body: form,
     },
   );
@@ -237,7 +249,10 @@ async function callCloudflareMcp(
   toolName: "search" | "execute",
   code: string,
 ) {
-  const { token } = requireCloudflare(env);
+  const token = env.CLOUDFLARE_CONTROL_TOKEN ?? env.CLOUDFLARE_API_TOKEN;
+  if (!token) {
+    throw new Error("Cloudflare API MCP requires a bearer API token; legacy Global API Key auth is still supported for direct Worker and Builds tools");
+  }
   const endpoint = env.CLOUDFLARE_MCP_URL ?? "https://mcp.cloudflare.com/mcp";
 
   const response = await fetch(endpoint, {
