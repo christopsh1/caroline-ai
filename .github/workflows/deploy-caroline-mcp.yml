@@ -1,0 +1,40 @@
+name: Deploy caroline-mcp
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/caroline-mcp/**'
+      - '.github/workflows/deploy-caroline-mcp.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: services/caroline-mcp
+        run: npm install --no-audit --no-fund
+
+      - name: Validate Worker bundle
+        working-directory: services/caroline-mcp
+        run: npm run check
+
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: services/caroline-mcp
+          command: deploy
