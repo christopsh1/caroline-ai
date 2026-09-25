@@ -56,6 +56,15 @@ jobs:
           secret-path: ${{ vars.INFISICAL_SECRET_PATH }}
           domain: https://app.infisical.com
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: services/caroline-mcp
+        run: npm install --no-audit --no-fund
+
       - name: Verify Cloudflare access
         if: always()
         working-directory: services/caroline-mcp
