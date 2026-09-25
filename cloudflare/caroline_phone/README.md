@@ -18,7 +18,7 @@ Inbound caller
 
 Outbound request
   -> authenticated POST /twilio/outbound
-  -> DNC/policy check in Neon
+  -> DNC/contact policy check in Neon
   -> Twilio outbound call with async AMD
   -> signed Twilio voice webhook
   -> ElevenLabs Register Call API
@@ -83,7 +83,8 @@ Do not place raw database rows, verification secrets, complete caller history, p
 
 - Twilio form callbacks verify `X-Twilio-Signature` before processing.
 - The outbound JSON trigger requires `OUTBOUND_ADMIN_TOKEN`.
-- Outbound requests fail closed when Neon policy/audit state is unavailable and reject active DNC records before dialing.
+- Outbound requests fail closed when Neon policy/audit state is unavailable.
+- Outbound dialing rejects active DNC records, blocked customers, and known contacts with `voice_allowed=false` before Twilio is called.
 - ElevenLabs webhook tools authenticate with `ELEVENLABS_TOOL_SECRET` as a bearer token or `X-Caroline-Tool-Key` secret header.
 - Tool requests must contain a live `call_context_id`; the Worker resolves the real server-side call context.
 - Protected customer fields are withheld unless a current server-side `verification_sessions` row marks that caller verified.
@@ -188,6 +189,21 @@ The webhook handler queues compact correlation metadata only. The queue consumer
 
 No external chat model is used to summarize or extract memory. Durable-memory extraction remains policy-gated and is not fabricated in this branch.
 
+## Direct deployment only
+
+GitHub is source control and review history for this package. It is **not** the production deployment trigger.
+
+Do not enable a GitHub-to-Cloudflare build/deploy integration for `caroline-phone`. Production changes are deployed explicitly with Wrangler or the Cloudflare Worker editor after the deployment gates below pass. A draft PR, merge, or push must never deploy production by itself.
+
+Before any direct deployment:
+- record the current live Worker version/rollback target;
+- run `npm run check` from a standalone working copy of this package;
+- run a Wrangler dry-run/bundle validation;
+- verify the target account, Worker name, bindings, variables, and secret names;
+- deploy the Worker before attaching or enabling ElevenLabs webhook tools that depend on the new routes.
+
+Do not store Cloudflare API tokens, Neon credentials, Twilio auth tokens, ElevenLabs secrets, or OpenAI keys in Git or in the working directory.
+
 ## Deployment gate
 
 Do not deploy this branch until all of the following are true:
@@ -199,6 +215,6 @@ Do not deploy this branch until all of the following are true:
 6. Worker dry-run/bundle validation passes.
 7. A rollback target for the current `caroline-phone` version is recorded.
 8. Worker is deployed before ElevenLabs webhook tools are attached to the live agents.
-9. Inbound, outbound, DNC, tool, transfer, post-call, and queue tests pass in production verification.
+9. Inbound, outbound, DNC/contact-policy, tool, transfer, post-call, and queue tests pass in production verification.
 
 The current live Worker must not be described as updated until those deployment and verification steps actually occur.
