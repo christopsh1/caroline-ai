@@ -1,16 +1,22 @@
 import { neon } from '@neondatabase/serverless'
 
+type Row = Record<string, unknown>
+export type DatabaseQueryExecutor = <T extends Row = Row>(text: string, params?: unknown[]) => Promise<T[]>
+
 export type DatabaseEnv = {
   DATABASE_URL?: string
   CAROLINE_TENANT_KEY?: string
 }
 
-type Row = Record<string, unknown>
-
 type NeonSql = ReturnType<typeof neon>
-
 let cachedUrl = ''
 let cachedSql: NeonSql | null = null
+let testQueryExecutor: DatabaseQueryExecutor | null = null
+
+/** Unit-test hook only. Production request paths never call this function. */
+export function setDatabaseQueryForTests(executor: DatabaseQueryExecutor | null): void {
+  testQueryExecutor = executor
+}
 
 function sqlFor(env: DatabaseEnv): NeonSql {
   const connectionString = env.DATABASE_URL?.trim()
@@ -27,9 +33,8 @@ export async function queryRows<T extends Row = Row>(
   text: string,
   params: unknown[] = [],
 ): Promise<T[]> {
-  const sql = sqlFor(env) as NeonSql & {
-    query(queryText: string, queryParams?: unknown[]): Promise<T[]>
-  }
+  if (testQueryExecutor) return testQueryExecutor<T>(text, params)
+  const sql = sqlFor(env) as NeonSql & { query(queryText: string, queryParams?: unknown[]): Promise<T[]> }
   return sql.query(text, params)
 }
 
@@ -46,11 +51,7 @@ export async function requireTenantId(env: DatabaseEnv): Promise<string> {
   const tenantKey = env.CAROLINE_TENANT_KEY?.trim() || 'caroline'
   const row = await queryOne<{ id: string }>(
     env,
-    `select id::text as id
-       from tenants
-      where tenant_key = $1
-        and status = 'active'
-      limit 1`,
+    `select id::text as id from tenants where tenant_key = $1 and status = 'active' limit 1`,
     [tenantKey],
   )
   if (!row?.id) throw new Error('tenant_not_configured')
