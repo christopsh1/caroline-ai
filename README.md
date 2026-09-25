@@ -32,6 +32,15 @@ This repository is the source-controlled baseline of the Caroline production sys
 
 Do not apply files from this repository to production automatically. Stabilization work should occur on explicit non-production branches and be reviewed before any promotion.
 
+## Secret management
+
+- **Source of truth:** Infisical stores all secret values; this repository stores only secret names/placeholders.
+- **Cloudflare deploy sync:** `.github/workflows/deploy-caroline-event-worker.yml` and `.github/workflows/deploy-caroline-phone.yml` load secrets from Infisical at runtime, then deploy with Wrangler using those in-memory values.
+- **GitHub bootstrap inputs:** workflows require `INFISICAL_TOKEN` (GitHub secret), `INFISICAL_PROJECT_ID` (GitHub variable), and an environment slug (`workflow_dispatch` input `infisical_env` or `INFISICAL_ENV_SLUG` variable).
+- **Cloudflare runtime sync:** Worker runtime secrets are pushed during deploy through Wrangler secret sync (`secrets:`), while non-secret settings remain in `wrangler.toml`.
+- **Supabase alignment:** keep Supabase Edge Function secrets in Infisical and sync them via CI/release automation (or controlled manual sync), never by committing secret values.
+- **Rotation:** rotate in Infisical first, then trigger the relevant deploy/sync workflow (start in non-production, validate, then promote to production).
+
 ## Cloudflare MCP
 
 The repository connects MCP-compatible clients to Cloudflare's full API server through
