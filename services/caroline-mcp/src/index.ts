@@ -1,14 +1,23 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
+import {
+  deleteWorker,
+  deployWorkerCode,
+  executeCloudflareApiMcp,
+  getWorkerSettings,
+  listWorkers,
+  readWorkerCode,
+  searchCloudflareApiMcp,
+  type CloudflareEnv,
+} from "./cloudflare";
 
 type Risk = "read" | "write" | "restricted";
 type Provider = "local" | "cloudflare" | "github" | "railway" | "elevenlabs" | "docker";
 
-type Env = {
+type Env = CloudflareEnv & {
   MCP_GATEWAY_TOKEN?: string;
   ENVIRONMENT?: string;
-  CLOUDFLARE_MCP_URL?: string;
 };
 
 type Capability = {
@@ -52,22 +61,67 @@ const CAPABILITIES: Capability[] = [
     enabled: true,
   },
   {
-    id: "cloudflare.api.search",
+    id: "cloudflare.workers.list",
     provider: "cloudflare",
-    title: "Cloudflare API search",
-    description: "Search Cloudflare API MCP capabilities. Adapter is registered but disabled until provider authentication is configured.",
+    title: "List Cloudflare Workers",
+    description: "List Worker scripts in the configured Cloudflare account.",
     risk: "read",
     ownerApprovalRequired: false,
-    enabled: false,
+    enabled: true,
+  },
+  {
+    id: "cloudflare.workers.settings",
+    provider: "cloudflare",
+    title: "Read Worker settings",
+    description: "Read settings and bindings metadata for a Worker script.",
+    risk: "read",
+    ownerApprovalRequired: false,
+    enabled: true,
+  },
+  {
+    id: "cloudflare.workers.read_code",
+    provider: "cloudflare",
+    title: "Read Worker code",
+    description: "Read the deployed Worker script content without modifying it.",
+    risk: "read",
+    ownerApprovalRequired: false,
+    enabled: true,
+  },
+  {
+    id: "cloudflare.workers.deploy_code",
+    provider: "cloudflare",
+    title: "Create or edit Worker code",
+    description: "Create a Worker or replace its deployed module source using the stable Workers Scripts API.",
+    risk: "write",
+    ownerApprovalRequired: true,
+    enabled: true,
+  },
+  {
+    id: "cloudflare.workers.delete",
+    provider: "cloudflare",
+    title: "Delete Worker",
+    description: "Delete a Worker script. This is destructive and always requires explicit owner confirmation.",
+    risk: "write",
+    ownerApprovalRequired: true,
+    enabled: true,
+  },
+  {
+    id: "cloudflare.api.search",
+    provider: "cloudflare",
+    title: "Search the full Cloudflare API",
+    description: "Call the official Cloudflare API MCP search tool against the OpenAPI catalog covering more than 2,500 endpoints.",
+    risk: "read",
+    ownerApprovalRequired: false,
+    enabled: true,
   },
   {
     id: "cloudflare.api.execute",
     provider: "cloudflare",
-    title: "Cloudflare API execute",
-    description: "Execute a Cloudflare API MCP operation after policy evaluation. Disabled until provider authentication is configured.",
+    title: "Execute against the full Cloudflare API",
+    description: "Call the official Cloudflare API MCP execute tool. Because this surface can mutate the account, this gateway requires explicit owner confirmation for every call.",
     risk: "write",
     ownerApprovalRequired: true,
-    enabled: false,
+    enabled: true,
   },
   {
     id: "github.repo.read",
@@ -135,9 +189,8 @@ const CAPABILITIES: Capability[] = [
 ];
 
 function asToolResult(value: unknown) {
-  const text = JSON.stringify(value, null, 2);
   return {
-    content: [{ type: "text" as const, text }],
+    content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
     structuredContent: value as Record<string, unknown>,
   };
 }
@@ -164,22 +217,44 @@ function getCapability(id: string) {
   return CAPABILITIES.find((capability) => capability.id === id);
 }
 
+function cloudflareConfigured(env: Env) {
+  return Boolean(env.CLOUDFLARE_CONTROL_TOKEN && env.CLOUDFLARE_ACCOUNT_ID);
+}
+
 function systemStatus(env: Env) {
   return {
     service: "caroline-mcp",
     version: VERSION,
     environment: env.ENVIRONMENT ?? "unknown",
     gateway_locked: !env.MCP_GATEWAY_TOKEN,
-    execution_policy: "deny-by-default",
+    execution_policy: "deny-by-default; explicit confirmation for writes",
     registered_capabilities: CAPABILITIES.length,
     enabled_capabilities: CAPABILITIES.filter((capability) => capability.enabled).map((capability) => capability.id),
+    cloudflare: {
+      configured: cloudflareConfigured(env),
+      api_mcp_url: env.CLOUDFLARE_MCP_URL ?? "https://mcp.cloudflare.com/mcp",
+      workers_read: cloudflareConfigured(env),
+      workers_write: cloudflareConfigured(env),
+      full_api_search: cloudflareConfigured(env),
+      full_api_execute: cloudflareConfigured(env),
+    },
     upstreams: {
-      cloudflare: env.CLOUDFLARE_MCP_URL ?? "https://mcp.cloudflare.com/mcp",
       github: "registered-not-connected",
       railway: "registered-not-connected",
       elevenlabs: "registered-not-connected",
       docker: "registered-not-connected",
     },
+  };
+}
+
+function approvalRequired(capability: Capability, confirmWrite?: boolean) {
+  if (!capability.ownerApprovalRequired) return null;
+  if (confirmWrite === true) return null;
+  return {
+    ok: false,
+    status: "approval_required",
+    reason: "explicit_owner_confirmation_required",
+    capability,
   };
 }
 
@@ -195,44 +270,84 @@ async function executeCapability(
   }
 
   if (!capability.enabled) {
-    return {
-      ok: false,
-      status: "blocked",
-      reason: "provider_adapter_not_enabled",
-      capability,
-    };
+    return { ok: false, status: "blocked", reason: "provider_adapter_not_enabled", capability };
   }
 
-  if (capability.ownerApprovalRequired && confirmWrite !== true) {
+  const approval = approvalRequired(capability, confirmWrite);
+  if (approval) return approval;
+
+  try {
+    switch (capability.id) {
+      case "caroline.system.status":
+        return { ok: true, status: "completed", output: systemStatus(env) };
+      case "caroline.capabilities.search": {
+        const query = typeof input?.query === "string" ? input.query : undefined;
+        return { ok: true, status: "completed", output: searchCapabilities(query) };
+      }
+      case "caroline.capabilities.describe": {
+        const id = typeof input?.id === "string" ? input.id : "";
+        const described = getCapability(id);
+        return described
+          ? { ok: true, status: "completed", output: described }
+          : { ok: false, status: "denied", reason: "unknown_capability", capability_id: id };
+      }
+      case "cloudflare.workers.list":
+        return { ok: true, status: "completed", output: await listWorkers(env) };
+      case "cloudflare.workers.settings":
+        return {
+          ok: true,
+          status: "completed",
+          output: await getWorkerSettings(env, String(input?.script_name ?? "")),
+        };
+      case "cloudflare.workers.read_code":
+        return {
+          ok: true,
+          status: "completed",
+          output: await readWorkerCode(env, String(input?.script_name ?? "")),
+        };
+      case "cloudflare.workers.deploy_code":
+        return {
+          ok: true,
+          status: "completed",
+          output: await deployWorkerCode(env, {
+            scriptName: String(input?.script_name ?? ""),
+            source: String(input?.source ?? ""),
+            mainModule: typeof input?.main_module === "string" ? input.main_module : undefined,
+            compatibilityDate: typeof input?.compatibility_date === "string" ? input.compatibility_date : undefined,
+            compatibilityFlags: Array.isArray(input?.compatibility_flags)
+              ? input.compatibility_flags.map(String)
+              : undefined,
+            bindings: Array.isArray(input?.bindings) ? input.bindings : undefined,
+          }),
+        };
+      case "cloudflare.workers.delete":
+        return {
+          ok: true,
+          status: "completed",
+          output: await deleteWorker(env, String(input?.script_name ?? "")),
+        };
+      case "cloudflare.api.search":
+        return {
+          ok: true,
+          status: "completed",
+          output: await searchCloudflareApiMcp(env, String(input?.code ?? "")),
+        };
+      case "cloudflare.api.execute":
+        return {
+          ok: true,
+          status: "completed",
+          output: await executeCloudflareApiMcp(env, String(input?.code ?? "")),
+        };
+      default:
+        return { ok: false, status: "blocked", reason: "no_execution_adapter", capability };
+    }
+  } catch (error) {
     return {
       ok: false,
-      status: "approval_required",
-      reason: "explicit_owner_confirmation_required",
-      capability,
+      status: "error",
+      capability_id: capability.id,
+      error: error instanceof Error ? error.message : String(error),
     };
-  }
-
-  switch (capability.id) {
-    case "caroline.system.status":
-      return { ok: true, status: "completed", output: systemStatus(env) };
-    case "caroline.capabilities.search": {
-      const query = typeof input?.query === "string" ? input.query : undefined;
-      return { ok: true, status: "completed", output: searchCapabilities(query) };
-    }
-    case "caroline.capabilities.describe": {
-      const id = typeof input?.id === "string" ? input.id : "";
-      const described = getCapability(id);
-      return described
-        ? { ok: true, status: "completed", output: described }
-        : { ok: false, status: "denied", reason: "unknown_capability", capability_id: id };
-    }
-    default:
-      return {
-        ok: false,
-        status: "blocked",
-        reason: "no_execution_adapter",
-        capability,
-      };
   }
 }
 
@@ -242,7 +357,7 @@ function createServer(env: Env) {
   server.registerTool(
     "caroline_system_status",
     {
-      description: "Read the status and security posture of the Caroline MCP control plane.",
+      description: "Read the status, connected providers, and security posture of the Caroline MCP control plane.",
       inputSchema: {},
     },
     async () => asToolResult(systemStatus(env)),
@@ -268,18 +383,14 @@ function createServer(env: Env) {
     },
     async ({ id }) => {
       const capability = getCapability(id);
-      return asToolResult(
-        capability
-          ? { found: true, capability }
-          : { found: false, capability_id: id },
-      );
+      return asToolResult(capability ? { found: true, capability } : { found: false, capability_id: id });
     },
   );
 
   server.registerTool(
     "caroline_capabilities_execute",
     {
-      description: "Execute one registered capability through Caroline's policy gate. Disabled providers fail closed.",
+      description: "Execute one registered capability through Caroline's policy gate. Write capabilities require confirm_write=true.",
       inputSchema: {
         capability_id: z.string().min(1),
         input: z.record(z.string(), z.unknown()).optional(),
@@ -288,6 +399,155 @@ function createServer(env: Env) {
     },
     async ({ capability_id, input, confirm_write }) =>
       asToolResult(await executeCapability(env, capability_id, input, confirm_write)),
+  );
+
+  server.registerTool(
+    "cloudflare_workers_list",
+    {
+      description: "List all Cloudflare Worker scripts in Caroline's configured account.",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        return asToolResult(await listWorkers(env));
+      } catch (error) {
+        return asToolResult({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    },
+  );
+
+  server.registerTool(
+    "cloudflare_worker_get_settings",
+    {
+      description: "Read Cloudflare Worker settings and bindings metadata.",
+      inputSchema: { script_name: z.string().min(1) },
+    },
+    async ({ script_name }) => {
+      try {
+        return asToolResult(await getWorkerSettings(env, script_name));
+      } catch (error) {
+        return asToolResult({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    },
+  );
+
+  server.registerTool(
+    "cloudflare_worker_read_code",
+    {
+      description: "Read the currently deployed source/bundle for a Cloudflare Worker. Read-only.",
+      inputSchema: { script_name: z.string().min(1) },
+    },
+    async ({ script_name }) => {
+      try {
+        return asToolResult(await readWorkerCode(env, script_name));
+      } catch (error) {
+        return asToolResult({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    },
+  );
+
+  server.registerTool(
+    "cloudflare_worker_deploy_code",
+    {
+      description: "Create a Worker or replace its deployed ES-module source. This is a write and requires confirm_write=true.",
+      inputSchema: {
+        script_name: z.string().min(1),
+        source: z.string().min(1),
+        main_module: z.string().default("index.js"),
+        compatibility_date: z.string().optional(),
+        compatibility_flags: z.array(z.string()).optional(),
+        bindings: z.array(z.unknown()).optional(),
+        confirm_write: z.boolean().optional(),
+      },
+    },
+    async ({ script_name, source, main_module, compatibility_date, compatibility_flags, bindings, confirm_write }) => {
+      if (confirm_write !== true) {
+        return asToolResult({
+          ok: false,
+          status: "approval_required",
+          reason: "explicit_owner_confirmation_required",
+        });
+      }
+      try {
+        return asToolResult(
+          await deployWorkerCode(env, {
+            scriptName: script_name,
+            source,
+            mainModule: main_module,
+            compatibilityDate: compatibility_date,
+            compatibilityFlags: compatibility_flags,
+            bindings,
+          }),
+        );
+      } catch (error) {
+        return asToolResult({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    },
+  );
+
+  server.registerTool(
+    "cloudflare_worker_delete",
+    {
+      description: "Delete a Cloudflare Worker. Destructive; requires confirm_write=true.",
+      inputSchema: {
+        script_name: z.string().min(1),
+        confirm_write: z.boolean().optional(),
+      },
+    },
+    async ({ script_name, confirm_write }) => {
+      if (confirm_write !== true) {
+        return asToolResult({
+          ok: false,
+          status: "approval_required",
+          reason: "explicit_owner_confirmation_required",
+        });
+      }
+      try {
+        return asToolResult(await deleteWorker(env, script_name));
+      } catch (error) {
+        return asToolResult({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    },
+  );
+
+  server.registerTool(
+    "cloudflare_api_search",
+    {
+      description: "Search Cloudflare's official full API MCP OpenAPI catalog. Pass JavaScript code that inspects codemode.spec().",
+      inputSchema: { code: z.string().min(1) },
+    },
+    async ({ code }) => {
+      try {
+        return asToolResult(await searchCloudflareApiMcp(env, code));
+      } catch (error) {
+        return asToolResult({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    },
+  );
+
+  server.registerTool(
+    "cloudflare_api_execute",
+    {
+      description: "Execute code through Cloudflare's official full API MCP. This is a privileged surface and requires confirm_write=true for every call.",
+      inputSchema: {
+        code: z.string().min(1),
+        confirm_write: z.boolean().optional(),
+      },
+    },
+    async ({ code, confirm_write }) => {
+      if (confirm_write !== true) {
+        return asToolResult({
+          ok: false,
+          status: "approval_required",
+          reason: "explicit_owner_confirmation_required",
+        });
+      }
+      try {
+        return asToolResult(await executeCloudflareApiMcp(env, code));
+      } catch (error) {
+        return asToolResult({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    },
   );
 
   return server;
@@ -319,6 +579,7 @@ export default {
         environment: env.ENVIRONMENT ?? "unknown",
         mcp_endpoint: "/mcp",
         gateway_locked: !env.MCP_GATEWAY_TOKEN,
+        cloudflare_configured: cloudflareConfigured(env),
       });
     }
 
