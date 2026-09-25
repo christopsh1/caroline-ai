@@ -37,24 +37,31 @@ jobs:
         shell: bash
         env:
           INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+          INFISICAL_PROJECT_ID: ${{ vars.INFISICAL_PROJECT_ID }}
+          FALLBACK_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          FALLBACK_CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          FALLBACK_CAROLINE_KEY: ${{ secrets.CAROLINE_KEY }}
+          FALLBACK_CORE_RUNTIME_KEY: ${{ secrets.CORE_RUNTIME_KEY }}
+          FALLBACK_ELEVENLABS_WEBHOOK_SECRET: ${{ secrets.ELEVENLABS_WEBHOOK_SECRET }}
+          FALLBACK_TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          FALLBACK_OPEN_ROUTER_KEY: ${{ secrets.OPEN_ROUTER_KEY }}
         run: |
           set -euo pipefail
-          if [[ -z "${INFISICAL_TOKEN:-}" ]]; then
-            echo "Missing required GitHub secret: INFISICAL_TOKEN" >&2
+          if [[ -n "${INFISICAL_TOKEN:-}" && -n "${INFISICAL_PROJECT_ID:-}" ]]; then
+            npx --yes @infisical/cli@latest export \
+              --token "${INFISICAL_TOKEN}" \
+              --projectId "${INFISICAL_PROJECT_ID}" \
+              --env "${INFISICAL_ENV_SLUG}" \
+              --format dotenv > /tmp/infisical-caroline-event-worker.env
+            set -a
+            source /tmp/infisical-caroline-event-worker.env
+            set +a
+          elif [[ -z "${INFISICAL_TOKEN:-}" && -z "${INFISICAL_PROJECT_ID:-}" ]]; then
+            echo "INFISICAL_TOKEN and INFISICAL_PROJECT_ID not set; using GitHub secrets/variables fallback."
+          else
+            echo "Incomplete Infisical configuration: set both INFISICAL_TOKEN and INFISICAL_PROJECT_ID, or neither." >&2
             exit 1
           fi
-          if [[ -z "${INFISICAL_PROJECT_ID:-}" ]]; then
-            echo "Missing required GitHub variable: INFISICAL_PROJECT_ID" >&2
-            exit 1
-          fi
-          npx --yes @infisical/cli@latest export \
-            --token "${INFISICAL_TOKEN}" \
-            --projectId "${INFISICAL_PROJECT_ID}" \
-            --env "${INFISICAL_ENV_SLUG}" \
-            --format dotenv > /tmp/infisical-caroline-event-worker.env
-          set -a
-          source /tmp/infisical-caroline-event-worker.env
-          set +a
           required=(
             CLOUDFLARE_API_TOKEN
             CLOUDFLARE_ACCOUNT_ID
@@ -67,7 +74,10 @@ jobs:
           for name in "${required[@]}"; do
             value="$(printenv "${name}" || true)"
             if [[ -z "${value}" ]]; then
-              echo "Missing required Infisical secret: ${name}" >&2
+              value="$(printenv "FALLBACK_${name}" || true)"
+            fi
+            if [[ -z "${value}" ]]; then
+              echo "Missing required secret: ${name} (Infisical or GitHub fallback)." >&2
               exit 1
             fi
             {
