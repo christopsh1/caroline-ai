@@ -10,12 +10,13 @@ export type ElevenLabsEnv = {
 
 export type RegisterCallInput = {
   call_sid: string
+  call_context_id: string
   direction: CallDirection
   from_number: string
   to_number: string
 }
 
-function runtimeForDirection(env: ElevenLabsEnv, direction: CallDirection) {
+export function runtimeForDirection(env: ElevenLabsEnv, direction: CallDirection) {
   if (direction === 'outbound') {
     if (!env.ELEVENLABS_OUTBOUND_AGENT_ID) throw new Error('elevenlabs_outbound_agent_id_missing')
     return {
@@ -39,9 +40,8 @@ export async function registerElevenLabsCall(
   if (!env.ELEVENLABS_API_KEY) throw new Error('elevenlabs_api_key_missing')
 
   const runtime = runtimeForDirection(env, input.direction)
-  const dynamicVariables = await buildCallStartVariables(input)
   const initiationData: Record<string, unknown> = {
-    dynamic_variables: dynamicVariables,
+    dynamic_variables: buildCallStartVariables(input.call_context_id),
   }
   if (runtime.branchId) initiationData.branch_id = runtime.branchId
 
