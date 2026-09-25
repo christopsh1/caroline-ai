@@ -36,6 +36,9 @@ async function mcpRequest(method, params = {}, bearer) {
     "MCP-Protocol-Version": protocolVersion,
     "Mcp-Method": method,
   };
+  if (method === "tools/call" && typeof params?.name === "string") {
+    headers["Mcp-Name"] = params.name;
+  }
   if (bearer) headers.Authorization = `Bearer ${bearer}`;
 
   const response = await fetch(endpoint, {
@@ -82,14 +85,12 @@ function assertToolCatalog(payload, label) {
   return { tools, names };
 }
 
-// Clients must be able to discover the catalog before supplying a gateway token.
 const publicList = await mcpRequest("tools/list");
 if (!publicList.response.ok) {
   throw new Error(`Unauthenticated tools/list failed: HTTP ${publicList.response.status}: ${publicList.raw.slice(0, 1000)}`);
 }
 const publicCatalog = assertToolCatalog(publicList.payload, "Unauthenticated tools/list");
 
-// Discovery must not accidentally make execution public.
 const publicCall = await mcpRequest("tools/call", {
   name: "cloudflare_workers_list",
   arguments: {},
@@ -98,14 +99,12 @@ if (publicCall.response.status !== 401) {
   throw new Error(`Unauthenticated tools/call must return 401, got HTTP ${publicCall.response.status}: ${publicCall.raw.slice(0, 1000)}`);
 }
 
-// Authenticated discovery must continue to expose the same catalog.
 const privateList = await mcpRequest("tools/list", {}, token);
 if (!privateList.response.ok) {
   throw new Error(`Authenticated tools/list failed: HTTP ${privateList.response.status}: ${privateList.raw.slice(0, 1000)}`);
 }
 const privateCatalog = assertToolCatalog(privateList.payload, "Authenticated tools/list");
 
-// Exercise one safe read-only Cloudflare tool through the live MCP execution path.
 const readCall = await mcpRequest("tools/call", {
   name: "cloudflare_workers_list",
   arguments: {},
