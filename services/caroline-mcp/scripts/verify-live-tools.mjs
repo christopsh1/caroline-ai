@@ -1,35 +1,14 @@
 const endpoint = process.env.CAROLINE_MCP_URL ?? "https://caroline-mcp.customerservice-882.workers.dev/mcp";
 const token = process.env.MCP_GATEWAY_TOKEN?.trim();
 
-if (!token) throw new Error("MCP_GATEWAY_TOKEN is required for live MCP discovery verification");
+if (!token) throw new Error("MCP_GATEWAY_TOKEN is required for live MCP verification");
 
+const protocolVersion = "2026-07-28";
 const meta = {
-  "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+  "io.modelcontextprotocol/protocolVersion": protocolVersion,
   "io.modelcontextprotocol/clientCapabilities": {},
   "io.modelcontextprotocol/clientInfo": { name: "caroline-ci", version: "1.0.0" },
 };
-
-const response = await fetch(endpoint, {
-  method: "POST",
-  headers: {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-    Accept: "application/json, text/event-stream",
-    "MCP-Protocol-Version": "2026-07-28",
-    "Mcp-Method": "tools/list",
-  },
-  body: JSON.stringify({
-    jsonrpc: "2.0",
-    id: "caroline-ci-tools-list",
-    method: "tools/list",
-    params: { _meta: meta },
-  }),
-});
-
-const raw = await response.text();
-if (!response.ok) {
-  throw new Error(`MCP tools/list failed: HTTP ${response.status}: ${raw.slice(0, 1000)}`);
-}
 
 function decodePayload(text, contentType) {
   if (contentType.includes("text/event-stream")) {
@@ -38,11 +17,11 @@ function decodePayload(text, contentType) {
       .filter((line) => line.startsWith("data:"))
       .map((line) => line.slice(5).trim())
       .filter(Boolean);
-    if (!dataLines.length) throw new Error(`MCP tools/list returned SSE without data: ${text.slice(0, 1000)}`);
+    if (!dataLines.length) throw new Error(`MCP returned SSE without data: ${text.slice(0, 1000)}`);
     for (const line of dataLines) {
       try {
         const value = JSON.parse(line);
-        if (value?.result?.tools) return value;
+        if (value?.result || value?.error) return value;
       } catch {}
     }
     return JSON.parse(dataLines.at(-1));
@@ -50,32 +29,104 @@ function decodePayload(text, contentType) {
   return JSON.parse(text);
 }
 
-const payload = decodePayload(raw, response.headers.get("content-type") ?? "");
-if (payload?.error) throw new Error(`MCP tools/list JSON-RPC error: ${JSON.stringify(payload.error)}`);
+async function mcpRequest(method, params = {}, bearer) {
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+    "MCP-Protocol-Version": protocolVersion,
+    "Mcp-Method": method,
+  };
+  if (bearer) headers.Authorization = `Bearer ${bearer}`;
 
-const tools = payload?.result?.tools;
-if (!Array.isArray(tools)) {
-  throw new Error(`MCP tools/list response did not contain a tools array: ${raw.slice(0, 1000)}`);
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: `caroline-ci-${method}-${crypto.randomUUID()}`,
+      method,
+      params: { ...params, _meta: meta },
+    }),
+  });
+  const raw = await response.text();
+  let payload;
+  try {
+    payload = decodePayload(raw, response.headers.get("content-type") ?? "");
+  } catch {
+    payload = { raw };
+  }
+  return { response, raw, payload };
 }
 
-const names = new Set(tools.map((tool) => tool?.name).filter(Boolean));
-const required = [
-  "cloudflare_workers_list",
-  "cloudflare_worker_get_settings",
-  "cloudflare_worker_read_code",
-  "cloudflare_worker_deploy_code",
-  "cloudflare_worker_deploy_modules",
-  "cloudflare_worker_delete",
-  "cloudflare_builds_list",
-  "cloudflare_api_search",
-  "cloudflare_api_execute",
-];
+function assertToolCatalog(payload, label) {
+  if (payload?.error) throw new Error(`${label} JSON-RPC error: ${JSON.stringify(payload.error)}`);
+  const tools = payload?.result?.tools;
+  if (!Array.isArray(tools)) throw new Error(`${label} did not contain a tools array: ${JSON.stringify(payload).slice(0, 1000)}`);
 
-const missing = required.filter((name) => !names.has(name));
-if (missing.length) {
-  throw new Error(`Live MCP is missing Cloudflare tools: ${missing.join(", ")}. Exposed tools: ${[...names].sort().join(", ")}`);
+  const names = new Set(tools.map((tool) => tool?.name).filter(Boolean));
+  const required = [
+    "cloudflare_workers_list",
+    "cloudflare_worker_get_settings",
+    "cloudflare_worker_read_code",
+    "cloudflare_worker_deploy_code",
+    "cloudflare_worker_deploy_modules",
+    "cloudflare_worker_delete",
+    "cloudflare_builds_list",
+    "cloudflare_api_search",
+    "cloudflare_api_execute",
+  ];
+  const missing = required.filter((name) => !names.has(name));
+  if (missing.length) {
+    throw new Error(`${label} is missing Cloudflare tools: ${missing.join(", ")}. Exposed tools: ${[...names].sort().join(", ")}`);
+  }
+  return { tools, names };
 }
 
-const cloudflareTools = [...names].filter((name) => name.startsWith("cloudflare_")).sort();
-console.log(`Live MCP tool discovery verified: ${tools.length} total tools; ${cloudflareTools.length} Cloudflare tools.`);
+// Clients must be able to discover the catalog before supplying a gateway token.
+const publicList = await mcpRequest("tools/list");
+if (!publicList.response.ok) {
+  throw new Error(`Unauthenticated tools/list failed: HTTP ${publicList.response.status}: ${publicList.raw.slice(0, 1000)}`);
+}
+const publicCatalog = assertToolCatalog(publicList.payload, "Unauthenticated tools/list");
+
+// Discovery must not accidentally make execution public.
+const publicCall = await mcpRequest("tools/call", {
+  name: "cloudflare_workers_list",
+  arguments: {},
+});
+if (publicCall.response.status !== 401) {
+  throw new Error(`Unauthenticated tools/call must return 401, got HTTP ${publicCall.response.status}: ${publicCall.raw.slice(0, 1000)}`);
+}
+
+// Authenticated discovery must continue to expose the same catalog.
+const privateList = await mcpRequest("tools/list", {}, token);
+if (!privateList.response.ok) {
+  throw new Error(`Authenticated tools/list failed: HTTP ${privateList.response.status}: ${privateList.raw.slice(0, 1000)}`);
+}
+const privateCatalog = assertToolCatalog(privateList.payload, "Authenticated tools/list");
+
+// Exercise one safe read-only Cloudflare tool through the live MCP execution path.
+const readCall = await mcpRequest("tools/call", {
+  name: "cloudflare_workers_list",
+  arguments: {},
+}, token);
+if (!readCall.response.ok) {
+  throw new Error(`Authenticated cloudflare_workers_list failed: HTTP ${readCall.response.status}: ${readCall.raw.slice(0, 1000)}`);
+}
+if (readCall.payload?.error) {
+  throw new Error(`Authenticated cloudflare_workers_list JSON-RPC error: ${JSON.stringify(readCall.payload.error)}`);
+}
+const structured = readCall.payload?.result?.structuredContent;
+if (structured && structured.ok === false) {
+  throw new Error(`Cloudflare Worker list returned an application error: ${JSON.stringify(structured).slice(0, 1000)}`);
+}
+
+const cloudflareTools = [...publicCatalog.names].filter((name) => name.startsWith("cloudflare_")).sort();
+if (privateCatalog.tools.length !== publicCatalog.tools.length) {
+  throw new Error(`Authenticated/public tool count mismatch: public=${publicCatalog.tools.length}, authenticated=${privateCatalog.tools.length}`);
+}
+
+console.log(`Public MCP discovery verified: ${publicCatalog.tools.length} total tools; ${cloudflareTools.length} Cloudflare tools.`);
+console.log("Unauthenticated tool execution correctly rejected with HTTP 401.");
+console.log("Authenticated cloudflare_workers_list execution verified.");
 console.log(`Cloudflare tools: ${cloudflareTools.join(", ")}`);
