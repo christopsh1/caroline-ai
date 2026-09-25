@@ -1,14 +1,18 @@
 export type CallDirection = 'inbound' | 'outbound'
 
 export type CallSessionState = {
+  call_context_id: string
   call_sid: string
   direction?: CallDirection
+  selected_agent_id?: string
+  elevenlabs_conversation_id?: string
   from_number?: string
   to_number?: string
   register_status?: 'registering' | 'registered' | 'register_failed'
   call_status?: string
   answered_by?: string
   registered_at?: string
+  expires_at?: string
   created_at: string
   updated_at: string
 }
@@ -52,11 +56,12 @@ export class CallSession {
       const next: CallSessionState = {
         ...(current ?? ({} as CallSessionState)),
         ...patch,
+        call_context_id: patch.call_context_id ?? current?.call_context_id ?? '',
         call_sid: patch.call_sid ?? current?.call_sid ?? '',
         created_at: current?.created_at ?? patch.created_at ?? now,
         updated_at: now,
       }
-      if (!next.call_sid) return new Response('call_sid_required', { status: 400 })
+      if (!next.call_context_id || !next.call_sid) return new Response('call_mapping_required', { status: 400 })
       await this.state.storage.put('call', next)
       return Response.json(next)
     }
@@ -65,17 +70,41 @@ export class CallSession {
   }
 }
 
+function stub(binding: CallSessionBinding, key: string): DurableObjectStubLike {
+  return binding.get(binding.idFromName(key))
+}
+
+async function writeState(binding: CallSessionBinding, key: string, state: Partial<CallSessionState>): Promise<CallSessionState> {
+  const response = await stub(binding, key).fetch('https://call-session.internal/state', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(state),
+  })
+  if (!response.ok) throw new Error(`call_session_update_${response.status}`)
+  return (await response.json()) as CallSessionState
+}
+
+export async function getCallSession(binding: CallSessionBinding, key: string): Promise<CallSessionState | null> {
+  const response = await stub(binding, key).fetch('https://call-session.internal/state')
+  if (!response.ok) throw new Error(`call_session_get_${response.status}`)
+  return (await response.json()) as CallSessionState | null
+}
+
+export async function createCallMapping(
+  binding: CallSessionBinding,
+  state: Omit<CallSessionState, 'created_at' | 'updated_at'>,
+): Promise<void> {
+  await writeState(binding, state.call_sid, state)
+  await writeState(binding, state.call_context_id, state)
+}
+
 export async function patchCallSession(
   binding: CallSessionBinding,
   callSid: string,
   patch: Partial<CallSessionState>,
 ): Promise<void> {
-  const id = binding.idFromName(callSid)
-  const stub = binding.get(id)
-  const response = await stub.fetch('https://call-session.internal/state', {
-    method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ call_sid: callSid, ...patch }),
-  })
-  if (!response.ok) throw new Error(`call_session_update_${response.status}`)
+  const current = await getCallSession(binding, callSid)
+  if (!current) throw new Error('call_session_not_found')
+  const next = await writeState(binding, callSid, { ...current, ...patch })
+  await writeState(binding, next.call_context_id, next)
 }
