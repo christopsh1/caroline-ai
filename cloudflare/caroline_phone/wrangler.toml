@@ -8,8 +8,10 @@ workers_dev = true
 enabled = true
 
 [vars]
-ELEVENLABS_AGENT_ID = "agent_8001m2ba4rmder6t7wq270ntj43j"
-ELEVENLABS_BRANCH_ID = "agtbrch_0501m336ns3ffdc8ej3wja70r001"
+ELEVENLABS_INBOUND_AGENT_ID = "agent_8001m2ba4rmder6t7wq270ntj43j"
+ELEVENLABS_INBOUND_BRANCH_ID = "agtbrch_0301m2ba4v10exarksax30ye678x"
+ELEVENLABS_OUTBOUND_AGENT_ID = "agent_0501m31c1xv6e40ayeab7bn67vet"
+ELEVENLABS_OUTBOUND_BRANCH_ID = "agtbrch_0201m31c1xvhfajthtqjs8p1wqpb"
 
 [[durable_objects.bindings]]
 name = "CALL_SESSION"
