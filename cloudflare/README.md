@@ -51,20 +51,20 @@ npm run check
 npm run deploy
 ```
 
-The Worker runtime secret values must be configured in Cloudflare, not committed to this repository. Use `.env.example` only as the name inventory.
+Worker runtime secrets must be configured directly in Cloudflare and must not be stored in source files.
 
-Runtime secret names:
+Runtime secret names used by current Cloudflare components include:
 
 - `CAROLINE_KEY`
 - `CORE_RUNTIME_KEY`
+- `ELEVENLABS_API_KEY`
+- `ELEVENLABS_TOOL_SECRET`
 - `ELEVENLABS_WEBHOOK_SECRET`
 - `TWILIO_AUTH_TOKEN`
-- `OPEN_ROUTER_KEY`
 
-Deployment credentials:
+Caroline Phone does not require or use an OpenRouter key in its live-call runtime.
 
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
+For local Wrangler authentication only, keep Cloudflare account credentials outside the project source directory.
 
 ## Security note
 
