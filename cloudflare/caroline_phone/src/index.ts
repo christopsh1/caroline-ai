@@ -1,35 +1,45 @@
-import { patchCallSession, type CallSessionBinding } from './call-session'
-import { registerElevenLabsCall } from './elevenlabs'
-import { LlmControl, type LlmControlBinding } from './llm-control'
-import { customLlmStatus, ensureCustomLlmConfigured, handleCustomLlm } from './llm'
+import { createCallMapping, patchCallSession, type CallSessionBinding } from './call-session'
+import { registerElevenLabsCall, runtimeForDirection } from './elevenlabs'
+import { verifyElevenLabsWebhook } from './elevenlabs-security'
+import { claimEvent, EventLedger, type EventLedgerBinding } from './event-ledger'
+import { handleElevenLabsTool } from './tools'
 import { verifyTwilioFormRequest } from './twilio-security'
 
 export { CallSession } from './call-session'
-export { LlmControl }
+export { EventLedger }
+
+export type QueueBinding = {
+  send(message: unknown): Promise<void>
+}
 
 export type Env = {
   TWILIO_AUTH_TOKEN?: string
   ELEVENLABS_API_KEY?: string
-  OPENROUTER_API_KEY?: string
+  ELEVENLABS_TOOL_SECRET?: string
+  ELEVENLABS_WEBHOOK_SECRET?: string
   ELEVENLABS_INBOUND_AGENT_ID: string
   ELEVENLABS_OUTBOUND_AGENT_ID: string
   ELEVENLABS_INBOUND_BRANCH_ID?: string
   ELEVENLABS_OUTBOUND_BRANCH_ID?: string
-  CAROLINE_PHONE_PUBLIC_URL?: string
   CALL_SESSION: CallSessionBinding
-  LLM_CONTROL?: LlmControlBinding
-}
-
-type ExecutionContextLike = {
-  waitUntil(promise: Promise<unknown>): void
+  EVENT_LEDGER?: EventLedgerBinding
+  POST_CALL_QUEUE?: QueueBinding
 }
 
 const FALLBACK_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response><Say>Sorry, this line is temporarily unavailable.</Say><Hangup/></Response>'
+const TOOL_ROUTES = new Set([
+  '/elevenlabs/tools/customer-lookup',
+  '/elevenlabs/tools/search-knowledge',
+  '/elevenlabs/tools/get-availability',
+  '/elevenlabs/tools/prepare-action',
+  '/elevenlabs/tools/commit-action',
+  '/elevenlabs/tools/transfer',
+])
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
   })
 }
 
@@ -45,13 +55,8 @@ function required(params: URLSearchParams, key: string): string | null {
   return value ? value : null
 }
 
-function phoneRuntimeReady(env: Env): boolean {
-  return Boolean(
-    env.TWILIO_AUTH_TOKEN &&
-      env.ELEVENLABS_API_KEY &&
-      env.ELEVENLABS_INBOUND_AGENT_ID &&
-      env.ELEVENLABS_OUTBOUND_AGENT_ID,
-  )
+function expiresAt(hours = 2): string {
+  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
 }
 
 async function verifiedTwilioForm(request: Request, env: Env): Promise<{ raw: string; params: URLSearchParams } | null> {
@@ -72,16 +77,24 @@ async function handleVoice(request: Request, env: Env, direction: 'inbound' | 'o
   const toNumber = required(verified.params, 'To')
   if (!callSid || !fromNumber || !toNumber) return json({ error: 'invalid_twilio_payload' }, 400)
 
+  const runtime = runtimeForDirection(env as Parameters<typeof runtimeForDirection>[0], direction)
+  const callContextId = crypto.randomUUID()
+
   try {
-    await patchCallSession(env.CALL_SESSION, callSid, {
+    await createCallMapping(env.CALL_SESSION, {
+      call_context_id: callContextId,
+      call_sid: callSid,
       direction,
+      selected_agent_id: runtime.agentId,
       from_number: fromNumber,
       to_number: toNumber,
       register_status: 'registering',
+      expires_at: expiresAt(),
     })
 
     const twiml = await registerElevenLabsCall(env as Parameters<typeof registerElevenLabsCall>[0], {
       call_sid: callSid,
+      call_context_id: callContextId,
       direction,
       from_number: fromNumber,
       to_number: toNumber,
@@ -135,30 +148,60 @@ async function handleAmd(request: Request, env: Env): Promise<Response> {
   }
 }
 
-async function health(env: Env): Promise<Response> {
-  const llm = env.LLM_CONTROL
-    ? await customLlmStatus(env as Parameters<typeof customLlmStatus>[0])
-    : {
-        openrouter_secret_configured: Boolean(env.OPENROUTER_API_KEY),
-        gateway_secret_created: false,
-        elevenlabs_secret_created: false,
-        configured_version: null,
-        configured_at: null,
-        last_error: null,
-      }
+async function handlePostCall(request: Request, env: Env): Promise<Response> {
+  if (!env.ELEVENLABS_WEBHOOK_SECRET || !env.EVENT_LEDGER || !env.POST_CALL_QUEUE) {
+    return json({ ok: false, error: 'post_call_not_configured' }, 503)
+  }
 
+  const rawBody = await request.text()
+  const valid = await verifyElevenLabsWebhook(
+    rawBody,
+    request.headers.get('elevenlabs-signature'),
+    env.ELEVENLABS_WEBHOOK_SECRET,
+  )
+  if (!valid) return json({ ok: false, error: 'invalid_signature' }, 401)
+
+  let event: any
+  try {
+    event = JSON.parse(rawBody)
+  } catch {
+    return json({ ok: false, error: 'invalid_json' }, 400)
+  }
+
+  const type = typeof event?.type === 'string' ? event.type : 'unknown'
+  const conversationId = typeof event?.data?.conversation_id === 'string' ? event.data.conversation_id : 'unknown'
+  const timestamp = String(event?.event_timestamp ?? 'unknown')
+  const eventId = `elevenlabs:${type}:${conversationId}:${timestamp}`
+
+  const claimed = await claimEvent(env.EVENT_LEDGER, eventId)
+  if (!claimed) return json({ ok: true, duplicate: true })
+
+  try {
+    await env.POST_CALL_QUEUE.send({
+      event_id: eventId,
+      type,
+      conversation_id: conversationId,
+      event,
+    })
+  } catch {
+    return json({ ok: false, error: 'queue_send_failed' }, 503)
+  }
+
+  return json({ ok: true, queued: true })
+}
+
+async function health(env: Env): Promise<Response> {
   return json({
     ok: true,
     service: 'caroline-phone',
-    canonical_context: 'pending_neon',
-    telephony_control: 'cloudflare',
+    conversational_runtime: 'elevenlabs-native',
+    live_model_proxy: false,
     inbound_agent_configured: Boolean(env.ELEVENLABS_INBOUND_AGENT_ID),
     outbound_agent_configured: Boolean(env.ELEVENLABS_OUTBOUND_AGENT_ID),
-    elevenlabs_secret_configured: Boolean(env.ELEVENLABS_API_KEY),
+    elevenlabs_api_secret_configured: Boolean(env.ELEVENLABS_API_KEY),
     twilio_secret_configured: Boolean(env.TWILIO_AUTH_TOKEN),
-    openrouter_secret_configured: Boolean(env.OPENROUTER_API_KEY),
-    phone_runtime_ready: phoneRuntimeReady(env),
-    custom_llm: llm,
+    tool_auth_configured: Boolean(env.ELEVENLABS_TOOL_SECRET),
+    post_call_webhook_configured: Boolean(env.ELEVENLABS_WEBHOOK_SECRET && env.EVENT_LEDGER && env.POST_CALL_QUEUE),
   })
 }
 
@@ -167,26 +210,16 @@ export default {
     const url = new URL(request.url)
 
     if (request.method === 'GET' && url.pathname === '/health') return health(env)
-
-    if (request.method === 'POST' && url.pathname === '/v1/chat/completions') {
-      if (!env.LLM_CONTROL) return json({ error: 'llm_control_unavailable' }, 503)
-      return handleCustomLlm(request, env as Parameters<typeof handleCustomLlm>[1])
-    }
-
     if (request.method !== 'POST') return json({ error: 'not_found' }, 404)
 
     if (url.pathname === '/twilio/inbound') return handleVoice(request, env, 'inbound')
     if (url.pathname === '/twilio/outbound') return handleVoice(request, env, 'outbound')
     if (url.pathname === '/twilio/status') return handleStatus(request, env)
     if (url.pathname === '/twilio/amd') return handleAmd(request, env)
+    if (TOOL_ROUTES.has(url.pathname)) return handleElevenLabsTool(request, env, url.pathname)
+    if (url.pathname === '/elevenlabs/webhooks/post-call') return handlePostCall(request, env)
 
+    // Intentionally no /v1/chat/completions route: ElevenLabs owns the live LLM runtime.
     return json({ error: 'not_found' }, 404)
-  },
-
-  async scheduled(_controller: unknown, env: Env, ctx: ExecutionContextLike): Promise<void> {
-    if (!env.LLM_CONTROL) return
-    ctx.waitUntil(
-      ensureCustomLlmConfigured(env as Parameters<typeof ensureCustomLlmConfigured>[0]).catch(() => undefined),
-    )
   },
 }
