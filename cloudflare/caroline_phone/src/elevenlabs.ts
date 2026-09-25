@@ -4,8 +4,6 @@ export type ElevenLabsEnv = {
   ELEVENLABS_API_KEY: string
   ELEVENLABS_INBOUND_AGENT_ID: string
   ELEVENLABS_OUTBOUND_AGENT_ID: string
-  ELEVENLABS_INBOUND_BRANCH_ID?: string
-  ELEVENLABS_OUTBOUND_BRANCH_ID?: string
 }
 
 export type RegisterCallInput = {
@@ -19,17 +17,11 @@ export type RegisterCallInput = {
 export function runtimeForDirection(env: ElevenLabsEnv, direction: CallDirection) {
   if (direction === 'outbound') {
     if (!env.ELEVENLABS_OUTBOUND_AGENT_ID) throw new Error('elevenlabs_outbound_agent_id_missing')
-    return {
-      agentId: env.ELEVENLABS_OUTBOUND_AGENT_ID,
-      branchId: env.ELEVENLABS_OUTBOUND_BRANCH_ID,
-    }
+    return { agentId: env.ELEVENLABS_OUTBOUND_AGENT_ID }
   }
 
   if (!env.ELEVENLABS_INBOUND_AGENT_ID) throw new Error('elevenlabs_inbound_agent_id_missing')
-  return {
-    agentId: env.ELEVENLABS_INBOUND_AGENT_ID,
-    branchId: env.ELEVENLABS_INBOUND_BRANCH_ID,
-  }
+  return { agentId: env.ELEVENLABS_INBOUND_AGENT_ID }
 }
 
 export async function registerElevenLabsCall(
@@ -40,11 +32,6 @@ export async function registerElevenLabsCall(
   if (!env.ELEVENLABS_API_KEY) throw new Error('elevenlabs_api_key_missing')
 
   const runtime = runtimeForDirection(env, input.direction)
-  const initiationData: Record<string, unknown> = {
-    dynamic_variables: buildCallStartVariables(input.call_context_id),
-  }
-  if (runtime.branchId) initiationData.branch_id = runtime.branchId
-
   const response = await fetchImpl('https://api.elevenlabs.io/v1/convai/twilio/register-call', {
     method: 'POST',
     headers: {
@@ -56,7 +43,9 @@ export async function registerElevenLabsCall(
       from_number: input.from_number,
       to_number: input.to_number,
       direction: input.direction,
-      conversation_initiation_client_data: initiationData,
+      conversation_initiation_client_data: {
+        dynamic_variables: buildCallStartVariables(input.call_context_id),
+      },
     }),
   })
 
