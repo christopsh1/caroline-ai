@@ -7,6 +7,11 @@ on:
       - 'cloudflare/**'
       - '.github/workflows/deploy-caroline-event-worker.yml'
   workflow_dispatch:
+    inputs:
+      infisical_env:
+        description: 'Infisical environment slug (ex: dev/staging/prod)'
+        required: false
+        default: 'staging'
 
 permissions:
   contents: read
@@ -14,6 +19,9 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      INFISICAL_PROJECT_ID: ${{ vars.INFISICAL_PROJECT_ID }}
+      INFISICAL_ENV_SLUG: ${{ github.event.inputs.infisical_env || vars.INFISICAL_ENV_SLUG || 'prod' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,6 +30,56 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Load deploy and runtime secrets from Infisical
+        id: infisical
+        shell: bash
+        env:
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${INFISICAL_TOKEN:-}" ]]; then
+            echo "Missing required GitHub secret: INFISICAL_TOKEN" >&2
+            exit 1
+          fi
+          if [[ -z "${INFISICAL_PROJECT_ID:-}" ]]; then
+            echo "Missing required GitHub variable: INFISICAL_PROJECT_ID" >&2
+            exit 1
+          fi
+          npx --yes @infisical/cli@latest export \
+            --token "${INFISICAL_TOKEN}" \
+            --projectId "${INFISICAL_PROJECT_ID}" \
+            --env "${INFISICAL_ENV_SLUG}" \
+            --format dotenv > /tmp/infisical-caroline-event-worker.env
+          set -a
+          source /tmp/infisical-caroline-event-worker.env
+          set +a
+          required=(
+            CLOUDFLARE_API_TOKEN
+            CLOUDFLARE_ACCOUNT_ID
+            CAROLINE_KEY
+            CORE_RUNTIME_KEY
+            ELEVENLABS_WEBHOOK_SECRET
+            TWILIO_AUTH_TOKEN
+            OPEN_ROUTER_KEY
+          )
+          for name in "${required[@]}"; do
+            value="$(printenv "${name}" || true)"
+            if [[ -z "${value}" ]]; then
+              echo "Missing required Infisical secret: ${name}" >&2
+              exit 1
+            fi
+            {
+              printf '%s<<__INFISICAL__\n' "${name}"
+              printf '%s\n' "${value}"
+              printf '__INFISICAL__\n'
+            } >> "${GITHUB_ENV}"
+            {
+              printf '%s<<__INFISICAL__\n' "${name}"
+              printf '%s\n' "${value}"
+              printf '__INFISICAL__\n'
+            } >> "${GITHUB_OUTPUT}"
+          done
 
       - name: Install dependencies
         working-directory: cloudflare
@@ -34,7 +92,13 @@ jobs:
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v4
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ steps.infisical.outputs.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ steps.infisical.outputs.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: cloudflare
           command: deploy
+          secrets: |
+            CAROLINE_KEY
+            CORE_RUNTIME_KEY
+            ELEVENLABS_WEBHOOK_SECRET
+            TWILIO_AUTH_TOKEN
+            OPEN_ROUTER_KEY

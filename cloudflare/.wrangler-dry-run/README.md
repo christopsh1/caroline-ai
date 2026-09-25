@@ -1,0 +1,1 @@
+This folder contains the built output assets for the worker "caroline-event-worker" generated at 2026-09-25T04:07:45.252Z.

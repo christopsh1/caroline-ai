@@ -51,7 +51,7 @@ npm run check
 npm run deploy
 ```
 
-The Worker runtime secret values must be configured in Cloudflare, not committed to this repository. Use `.env.example` only as the name inventory.
+The Worker runtime secret values must be configured in Cloudflare and never committed to this repository. In CI, deploy workflows load values from Infisical and sync them during deploy. Use `.env.example` only as the name inventory.
 
 Runtime secret names:
 
