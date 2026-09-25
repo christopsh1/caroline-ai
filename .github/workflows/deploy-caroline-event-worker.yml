@@ -4,7 +4,10 @@ on:
   push:
     branches: [main]
     paths:
-      - 'cloudflare/**'
+      - 'cloudflare/src/**'
+      - 'cloudflare/wrangler.toml'
+      - 'cloudflare/package.json'
+      - 'cloudflare/package-lock.json'
       - '.github/workflows/deploy-caroline-event-worker.yml'
   workflow_dispatch:
 
