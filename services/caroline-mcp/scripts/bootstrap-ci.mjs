@@ -1,4 +1,5 @@
 import { appendFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { createHmac, randomBytes } from "node:crypto";
 
 const env = process.env;
@@ -16,13 +17,6 @@ function first(names) {
     if (value) return { name, value };
   }
   return undefined;
-}
-
-function matching(re) {
-  return Object.keys(env)
-    .filter((name) => re.test(name))
-    .map((name) => ({ name, value: nonempty(env[name]) }))
-    .filter((entry) => entry.value);
 }
 
 function mask(value) {
@@ -50,76 +44,110 @@ async function cfFetch(path, auth, init = {}) {
   return fetch(`${CF_API}${path}`, { ...init, headers });
 }
 
-async function validBearer(token) {
+function wranglerWhoami(auth) {
+  const childEnv = { ...env };
+  delete childEnv.CLOUDFLARE_ACCOUNT_ID;
+  delete childEnv.CLOUDFLARE_API_TOKEN;
+  delete childEnv.CLOUDFLARE_API_KEY;
+  delete childEnv.CLOUDFLARE_EMAIL;
+
+  if (auth.kind === "bearer") {
+    childEnv.CLOUDFLARE_API_TOKEN = auth.token;
+  } else {
+    childEnv.CLOUDFLARE_API_KEY = auth.key;
+    childEnv.CLOUDFLARE_EMAIL = auth.email;
+  }
+
   try {
-    const response = await fetch(`${CF_API}/user/tokens/verify`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    const stdout = execFileSync("npx", ["wrangler", "whoami", "--json"], {
+      cwd: process.cwd(),
+      env: childEnv,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
     });
-    if (!response.ok) return false;
-    const body = await response.json().catch(() => ({}));
-    return body?.success === true && body?.result?.status !== "disabled";
+    const identity = JSON.parse(stdout);
+    return {
+      identity,
+      accounts: Array.isArray(identity?.accounts) ? identity.accounts : [],
+    };
   } catch {
-    return false;
+    return null;
   }
 }
 
+function bearerCandidates() {
+  const ordered = [
+    first(["CLOUDFLARE_CONTROL_TOKEN"]),
+    first(["CLOUDFLARE_API_TOKEN"]),
+    first(["CLOUDFLARE_BUILDS_TOKEN"]),
+  ].filter(Boolean);
+
+  const fallback = nonempty(env.GITHUB_FALLBACK_CF_TOKEN);
+  if (fallback) ordered.push({ name: "GITHUB_FALLBACK_CF_TOKEN", value: fallback });
+
+  const seen = new Set();
+  return ordered.filter((candidate) => {
+    if (seen.has(candidate.value)) return false;
+    seen.add(candidate.value);
+    return true;
+  });
+}
+
 async function chooseCloudflareAuth() {
-  const candidates = [];
-  const exact = first([
-    "CLOUDFLARE_CONTROL_TOKEN",
-    "CLOUDFLARE_API_TOKEN",
-    "CLOUDFLARE_BUILDS_TOKEN",
-  ]);
-  if (exact) candidates.push(exact);
-
-  for (const entry of matching(/^CLOUDFLARE.*(?:TOKEN|SECRET)$/i)) {
-    if (!candidates.some((candidate) => candidate.value === entry.value)) candidates.push(entry);
+  for (const candidate of bearerCandidates()) {
+    const auth = { kind: "bearer", token: candidate.value, source: candidate.name };
+    const whoami = wranglerWhoami(auth);
+    if (whoami) return { ...auth, accounts: whoami.accounts };
   }
 
-  const fallbackToken = nonempty(env.GITHUB_FALLBACK_CF_TOKEN);
-  if (fallbackToken && !candidates.some((candidate) => candidate.value === fallbackToken)) {
-    candidates.push({ name: "GITHUB_FALLBACK_CF_TOKEN", value: fallbackToken });
-  }
-
-  for (const candidate of candidates) {
-    if (await validBearer(candidate.value)) {
-      return { kind: "bearer", token: candidate.value, source: candidate.name };
-    }
-  }
-
-  const key = first(["CLOUDFLARE_API_KEY"]) ?? matching(/^CLOUDFLARE.*API.*KEY$/i)[0];
-  const email = first(["CLOUDFLARE_API_EMAIL", "CLOUDFLARE_EMAIL"]) ?? matching(/^CLOUDFLARE.*EMAIL$/i)[0];
+  const key = first(["CLOUDFLARE_API_KEY"]);
+  const email = first(["CLOUDFLARE_API_EMAIL", "CLOUDFLARE_EMAIL"]);
   if (key?.value && email?.value) {
-    const auth = { kind: "global-key", key: key.value, email: email.value, source: `${key.name}+${email.name}` };
-    const response = await cfFetch("/user", auth);
-    if (response.ok) return auth;
+    const auth = {
+      kind: "global-key",
+      key: key.value,
+      email: email.value,
+      source: `${key.name}+${email.name}`,
+    };
+    const whoami = wranglerWhoami(auth);
+    if (whoami) return { ...auth, accounts: whoami.accounts };
   }
 
-  throw new Error("No usable Cloudflare Workers credential was found in Infisical or the existing GitHub fallback credential");
+  throw new Error("No usable Cloudflare Workers credential was found in Infisical or the existing GitHub deployment credential");
+}
+
+async function workerExists(accountId, auth) {
+  const response = await cfFetch(
+    `/accounts/${encodeURIComponent(accountId)}/workers/scripts/caroline-mcp/settings`,
+    auth,
+  );
+  return response.ok;
 }
 
 async function resolveAccountId(auth) {
   const configured = nonempty(env.CLOUDFLARE_ACCOUNT_ID) ?? nonempty(env.GITHUB_FALLBACK_CF_ACCOUNT);
-  if (configured) {
-    const probe = await cfFetch(`/accounts/${encodeURIComponent(configured)}/workers/scripts/caroline-mcp/settings`, auth);
-    if (probe.ok || probe.status === 404) return configured;
-  }
+  if (configured && (await workerExists(configured, auth))) return configured;
 
-  const response = await cfFetch("/accounts?per_page=50", auth);
-  if (!response.ok) throw new Error(`Cloudflare account discovery failed with HTTP ${response.status}`);
-  const body = await response.json();
-  const accounts = Array.isArray(body?.result) ? body.result : [];
-  if (!accounts.length) throw new Error("Cloudflare credential can authenticate but has no visible accounts");
-
+  const accounts = Array.isArray(auth.accounts) ? auth.accounts : [];
   for (const account of accounts) {
     const id = nonempty(account?.id);
-    if (!id) continue;
-    const probe = await cfFetch(`/accounts/${encodeURIComponent(id)}/workers/scripts/caroline-mcp/settings`, auth);
-    if (probe.ok) return id;
+    if (id && (await workerExists(id, auth))) return id;
   }
 
   if (accounts.length === 1 && nonempty(accounts[0]?.id)) return accounts[0].id;
-  throw new Error("Multiple Cloudflare accounts are visible and none contains the existing caroline-mcp Worker");
+
+  const response = await cfFetch("/accounts?per_page=50", auth);
+  if (response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const visible = Array.isArray(body?.result) ? body.result : [];
+    for (const account of visible) {
+      const id = nonempty(account?.id);
+      if (id && (await workerExists(id, auth))) return id;
+    }
+    if (visible.length === 1 && nonempty(visible[0]?.id)) return visible[0].id;
+  }
+
+  throw new Error("Cloudflare authenticated successfully, but the account containing caroline-mcp could not be resolved");
 }
 
 async function infisicalAccessToken() {
@@ -176,15 +204,14 @@ async function persistGatewayToken(value) {
   });
 
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Could not persist MCP_GATEWAY_TOKEN to Infisical (HTTP ${response.status}): ${body.slice(0, 240)}`);
+    throw new Error(`Infisical secret write failed with HTTP ${response.status}`);
   }
 }
 
 const auth = await chooseCloudflareAuth();
 const accountId = await resolveAccountId(auth);
 console.log(`Cloudflare authentication verified (${auth.kind}; source=${auth.source}).`);
-console.log("Cloudflare account resolved for caroline-mcp.");
+console.log("Cloudflare account containing caroline-mcp resolved successfully.");
 
 if (checkOnly) process.exit(0);
 
@@ -193,14 +220,17 @@ exportEnv("CLOUDFLARE_ACCOUNT_ID", accountId);
 if (auth.kind === "bearer") {
   exportEnv("CLOUDFLARE_API_TOKEN", auth.token);
   exportEnv("CLOUDFLARE_CONTROL_TOKEN", nonempty(env.CLOUDFLARE_CONTROL_TOKEN) ?? auth.token);
-  exportEnv("CLOUDFLARE_BUILDS_TOKEN", nonempty(env.CLOUDFLARE_BUILDS_TOKEN) ?? nonempty(env.CLOUDFLARE_CONTROL_TOKEN) ?? auth.token);
+  exportEnv(
+    "CLOUDFLARE_BUILDS_TOKEN",
+    nonempty(env.CLOUDFLARE_BUILDS_TOKEN) ?? nonempty(env.CLOUDFLARE_CONTROL_TOKEN) ?? auth.token,
+  );
 } else {
   exportEnv("CLOUDFLARE_API_KEY", auth.key);
   exportEnv("CLOUDFLARE_API_EMAIL", auth.email);
   exportEnv("CLOUDFLARE_EMAIL", auth.email);
 }
 
-let gatewayToken = nonempty(env.MCP_GATEWAY_TOKEN) ?? nonempty(env.GITHUB_FALLBACK_MCP_GATEWAY_TOKEN);
+let gatewayToken = nonempty(env.MCP_GATEWAY_TOKEN);
 if (!gatewayToken) {
   const seed = auth.kind === "bearer" ? auth.token : auth.key;
   gatewayToken = createHmac("sha256", seed)
@@ -211,10 +241,10 @@ if (!gatewayToken) {
   try {
     await persistGatewayToken(gatewayToken);
     console.log("Generated MCP gateway bearer token and stored it in Infisical.");
-  } catch (error) {
-    console.log(`Infisical token persistence is unavailable; using stable derived gateway token for this deployment (${error instanceof Error ? error.message : "unknown error"}).`);
+  } catch {
+    console.log("Infisical OIDC write-back is unavailable; continuing with the stable generated gateway token.");
   }
 } else {
-  console.log("Using existing MCP gateway bearer token.");
+  console.log("Using existing MCP gateway bearer token from Infisical.");
 }
 exportEnv("MCP_GATEWAY_TOKEN", gatewayToken);
