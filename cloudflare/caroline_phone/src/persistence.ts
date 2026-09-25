@@ -194,7 +194,28 @@ export async function outboundAllowed(env: PersistenceEnv, e164Phone: string): P
       limit 1`,
     [tenantId, e164Phone],
   )
-  return !dnc?.blocked
+  if (dnc?.blocked) return false
+
+  const restrictedContact = await queryOne<{ blocked: boolean }>(
+    env,
+    `select true as blocked
+       from caller_identity_links cil
+       join customers c
+         on c.id = cil.customer_id
+        and c.tenant_id = cil.tenant_id
+       left join contact_preferences cp
+         on cp.tenant_id = c.tenant_id
+        and cp.customer_id = c.id
+      where cil.tenant_id = $1::uuid
+        and cil.identifier_type = 'phone'
+        and cil.normalized_value = $2
+        and cil.revoked_at is null
+        and (c.status = 'blocked' or cp.voice_allowed = false)
+      limit 1`,
+    [tenantId, e164Phone],
+  )
+
+  return !restrictedContact?.blocked
 }
 
 export async function persistPostCall(
