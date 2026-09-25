@@ -39,7 +39,9 @@ export async function expectedTwilioSignature(
   input: URLSearchParams | Record<string, string | string[]>,
 ): Promise<string> {
   const params = normalizedParams(input)
-  const keys = Array.from(new Set(params.keys())).sort()
+  const keySet = new Set<string>()
+  params.forEach((_value, key) => keySet.add(key))
+  const keys = Array.from(keySet).sort()
   let payload = publicUrl
 
   for (const key of keys) {
