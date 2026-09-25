@@ -4,6 +4,12 @@ export type CloudflareEnv = {
   CLOUDFLARE_MCP_URL?: string;
 };
 
+export type WorkerModule = {
+  name: string;
+  content: string;
+  type?: "esm" | "commonjs" | "text" | "json" | "wasm" | "data";
+};
+
 function requireCloudflare(env: CloudflareEnv) {
   if (!env.CLOUDFLARE_CONTROL_TOKEN) {
     throw new Error("CLOUDFLARE_CONTROL_TOKEN is not configured");
@@ -92,11 +98,29 @@ export async function readWorkerCode(env: CloudflareEnv, scriptName: string) {
   };
 }
 
-export async function deployWorkerCode(
+function moduleContentType(type: WorkerModule["type"] = "esm") {
+  switch (type) {
+    case "commonjs":
+      return "application/javascript";
+    case "text":
+      return "text/plain";
+    case "json":
+      return "application/json";
+    case "wasm":
+      return "application/wasm";
+    case "data":
+      return "application/octet-stream";
+    case "esm":
+    default:
+      return "application/javascript+module";
+  }
+}
+
+export async function deployWorkerModules(
   env: CloudflareEnv,
   input: {
     scriptName: string;
-    source: string;
+    modules: WorkerModule[];
     mainModule?: string;
     compatibilityDate?: string;
     compatibilityFlags?: string[];
@@ -104,7 +128,16 @@ export async function deployWorkerCode(
   },
 ) {
   const { accountId, token } = requireCloudflare(env);
-  const mainModule = input.mainModule ?? "index.js";
+  if (!input.modules.length) {
+    throw new Error("At least one Worker module is required");
+  }
+
+  const names = new Set(input.modules.map((module) => module.name));
+  const mainModule = input.mainModule ?? input.modules[0]?.name ?? "index.js";
+  if (!names.has(mainModule)) {
+    throw new Error(`main_module ${mainModule} is not present in modules`);
+  }
+
   const metadata: Record<string, unknown> = {
     main_module: mainModule,
     compatibility_date: input.compatibilityDate ?? new Date().toISOString().slice(0, 10),
@@ -123,11 +156,14 @@ export async function deployWorkerCode(
     new Blob([JSON.stringify(metadata)], { type: "application/json" }),
     "metadata.json",
   );
-  form.set(
-    mainModule,
-    new Blob([input.source], { type: "application/javascript+module" }),
-    mainModule,
-  );
+
+  for (const module of input.modules) {
+    form.set(
+      module.name,
+      new Blob([module.content], { type: moduleContentType(module.type) }),
+      module.name,
+    );
+  }
 
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/workers/scripts/${encodeURIComponent(input.scriptName)}`,
@@ -141,6 +177,28 @@ export async function deployWorkerCode(
   );
 
   return parseResponse(response);
+}
+
+export async function deployWorkerCode(
+  env: CloudflareEnv,
+  input: {
+    scriptName: string;
+    source: string;
+    mainModule?: string;
+    compatibilityDate?: string;
+    compatibilityFlags?: string[];
+    bindings?: unknown[];
+  },
+) {
+  const mainModule = input.mainModule ?? "index.js";
+  return deployWorkerModules(env, {
+    scriptName: input.scriptName,
+    modules: [{ name: mainModule, content: input.source, type: "esm" }],
+    mainModule,
+    compatibilityDate: input.compatibilityDate,
+    compatibilityFlags: input.compatibilityFlags,
+    bindings: input.bindings,
+  });
 }
 
 export async function deleteWorker(env: CloudflareEnv, scriptName: string) {

@@ -1,111 +1,113 @@
 # Caroline MCP Control Plane
 
-A Cloudflare Worker that exposes one authenticated MCP endpoint for Caroline and presents a small, policy-controlled capability surface instead of directly exposing every upstream provider tool.
+A Cloudflare Worker exposing one authenticated MCP endpoint for Caroline with an explicit, policy-controlled Cloudflare management surface.
 
-## Current state
+## v0.1 Worker management surface
 
-Version `0.1.0` is intentionally fail-closed at the gateway, but Cloudflare Worker management is implemented in the first release.
+The first version can manage Worker source as well as Git-backed Cloudflare Workers Builds.
 
-- Streamable HTTP MCP endpoint: `/mcp`
-- Health endpoint: `/health`
-- Authentication: bearer token from the Worker secret `MCP_GATEWAY_TOKEN`
-- Execution policy: deny by default; explicit confirmation for writes
-- Cloudflare Worker list/read/settings operations: implemented
-- Cloudflare Worker create/update code deployment: implemented and write-gated
-- Cloudflare Worker delete: implemented and write-gated
-- Official Cloudflare API MCP `search` pass-through: implemented
-- Official Cloudflare API MCP `execute` pass-through: implemented and privileged/write-gated
-- GitHub, Railway, ElevenLabs, and Docker adapters remain registered for later connection
+### Direct Worker operations
 
-If `MCP_GATEWAY_TOKEN` is missing, `/mcp` returns `503 gateway_locked`. This makes an accidental deployment safe by default.
+- `cloudflare_workers_list` — list Workers
+- `cloudflare_worker_get_settings` — read Worker settings/bindings
+- `cloudflare_worker_read_code` — read deployed code/bundle
+- `cloudflare_worker_deploy_code` — create/replace a single-module Worker
+- `cloudflare_worker_deploy_modules` — create/replace a multi-file Worker upload
+- `cloudflare_worker_delete` — delete a Worker
 
-## MCP tools
+### Workers Builds operations
 
-Core tools:
+- `cloudflare_builds_list` — list builds, optionally by Worker tag
+- `cloudflare_build_logs` — read build logs
+- `cloudflare_build_cancel` — cancel a build
+- `cloudflare_build_tokens_list` / `cloudflare_build_token_create`
+- `cloudflare_builds_github_installations`
+- `cloudflare_builds_github_repositories`
+- `cloudflare_builds_repo_connections_list`
+- `cloudflare_builds_repo_connection_create` / `cloudflare_builds_repo_connection_delete`
+- `cloudflare_worker_build_triggers_list`
+- `cloudflare_worker_build_trigger_create`
+- `cloudflare_worker_build_trigger_update`
+- `cloudflare_worker_build_trigger_delete`
+- `cloudflare_worker_build_run`
 
-- `caroline_system_status`
-- `caroline_capabilities_search`
-- `caroline_capabilities_describe`
-- `caroline_capabilities_execute`
+A normal Git-backed lifecycle is therefore:
 
-Cloudflare tools:
+```text
+GitHub repository
+  -> Cloudflare repo connection
+  -> Worker build trigger
+  -> build command
+  -> deploy command
+  -> build record/logs
+  -> production Worker
+```
 
-- `cloudflare_workers_list`
-- `cloudflare_worker_get_settings`
-- `cloudflare_worker_read_code`
-- `cloudflare_worker_deploy_code`
-- `cloudflare_worker_delete`
-- `cloudflare_api_search`
-- `cloudflare_api_execute`
+The direct module deploy path remains useful for small generated Workers that do not need npm/TypeScript compilation. Full projects with package dependencies should use Workers Builds.
 
-The capability registry exposes the same Cloudflare operations under IDs such as `cloudflare.workers.read_code`, `cloudflare.workers.deploy_code`, `cloudflare.api.search`, and `cloudflare.api.execute`.
+## Safety model
 
-## Cloudflare permissions
+- `/mcp` requires `Authorization: Bearer <MCP_GATEWAY_TOKEN>`.
+- If `MCP_GATEWAY_TOKEN` is not present, the MCP endpoint fails closed with `503 gateway_locked`.
+- Read tools do not require per-call mutation approval.
+- Create/edit/delete/cancel/run/configuration tools require `confirm_write=true`.
+- The generic `cloudflare_api_execute` surface is always treated as privileged/write-capable.
+- Existing Caroline production Workers are not implicitly targeted; every mutation requires an explicit Worker, trigger, build, or connection identifier.
 
-The Worker expects these runtime secrets:
+## Runtime credentials
+
+The deployed Worker expects four runtime values:
 
 ```text
 MCP_GATEWAY_TOKEN
 CLOUDFLARE_CONTROL_TOKEN
+CLOUDFLARE_BUILDS_TOKEN
 CLOUDFLARE_ACCOUNT_ID
 ```
 
-`CLOUDFLARE_CONTROL_TOKEN` is intentionally separate from the GitHub Actions deployment token. Give it only the Cloudflare permissions you want Caroline to have. For Worker management, it needs the relevant Workers Scripts read/edit permissions. Broader permissions expand what the `cloudflare_api_search` / `cloudflare_api_execute` path can access.
+Keep the tokens separate:
 
-Cloudflare's official API MCP is called at:
+- `MCP_GATEWAY_TOKEN` authenticates callers to Caroline MCP.
+- `CLOUDFLARE_CONTROL_TOKEN` is used for Workers Scripts management and the official Cloudflare API MCP.
+- `CLOUDFLARE_BUILDS_TOKEN` is used only for the Workers Builds REST API. Give it Workers Builds configuration permissions and, when GitHub installation discovery is needed, the user-scoped permission required by Cloudflare.
+- `CLOUDFLARE_ACCOUNT_ID` identifies the account and is supplied to the runtime without hard-coding it into source.
 
-```text
-https://mcp.cloudflare.com/mcp
-```
+Do not commit token values.
 
-and receives the control token as a bearer token. That upstream exposes Cloudflare's API through its `search` and `execute` tools.
+## Provisioning
 
-## Deploy
-
-The repository workflow `.github/workflows/deploy-caroline-mcp.yml` deploys only this service when files under `services/caroline-mcp/**` change. It reuses the repository's existing GitHub Actions deployment credentials to deploy the Worker, but it does not copy those credentials into the running Worker.
-
-The service is independently named `caroline-mcp`, so its deployment is isolated from the existing `caroline-ai` and `caroline-event-worker` Workers.
-
-Set the gateway secret:
-
-```bash
-cd services/caroline-mcp
-npx wrangler secret put MCP_GATEWAY_TOKEN
-```
-
-Set the Cloudflare runtime control token:
-
-```bash
-npx wrangler secret put CLOUDFLARE_CONTROL_TOKEN
-```
-
-Set the account ID as a secret or environment variable available to the Worker:
-
-```bash
-npx wrangler secret put CLOUDFLARE_ACCOUNT_ID
-```
-
-Use a long random `MCP_GATEWAY_TOKEN` and send it to the MCP endpoint as:
+The ordinary deployment workflow is:
 
 ```text
-Authorization: Bearer <token>
+.github/workflows/deploy-caroline-mcp.yml
 ```
 
-Do not store any runtime token in Git, `wrangler.toml`, or source files.
+It validates the service on pull requests and deploys only `caroline-mcp` after changes land on `main`.
 
-## Worker code behavior
+Dedicated runtime secrets are provisioned by:
 
-`cloudflare_worker_deploy_code` creates or replaces a Worker using the stable Workers Scripts upload API. It accepts ES-module JavaScript source, a main module name, compatibility date/flags, and optional bindings metadata. It requires `confirm_write=true`.
+```text
+.github/workflows/provision-caroline-mcp-runtime.yml
+```
 
-`cloudflare_worker_read_code` returns the deployed source or bundle content and its content type. Multi-module/bundled Workers may be returned as multipart content; the read path does not alter it.
+That workflow intentionally refuses to run if any dedicated runtime secret is missing and then deploys `caroline-mcp` with those Worker secrets. It does not reuse `CLOUDFLARE_API_TOKEN` as the runtime management token.
 
-For broader Cloudflare operations beyond the dedicated Worker helpers, use `cloudflare_api_search` followed by `cloudflare_api_execute`. The generic execute surface is deliberately confirmation-gated because the official Cloudflare API MCP can reach both read and mutation endpoints depending on the control token's scopes.
+## Endpoints
 
-## Next provider rollout
+- `GET /health` — public service health/status without secret values
+- `/mcp` — authenticated stateless Streamable HTTP MCP endpoint
 
-1. Verify the Cloudflare Worker tools against a non-production test Worker.
-2. Attach Cloudflare Access or another owner identity layer in front of `/mcp`.
-3. Connect GitHub read/write adapter.
-4. Connect Railway adapter.
-5. Connect ElevenLabs adapter.
-6. Connect Docker/Fly execution adapter for container-only MCP servers.
+The health response exposes whether the gateway, Workers control token, and Workers Builds token are configured, but never returns their values.
+
+## Full Cloudflare API
+
+Two additional tools expose Cloudflare's official API MCP:
+
+- `cloudflare_api_search` — search the API catalog
+- `cloudflare_api_execute` — execute API code, requiring `confirm_write=true`
+
+The dedicated Worker/Build tools should be preferred for normal Worker engineering because they have narrower schemas and clearer mutation boundaries.
+
+## Deferred provider adapters
+
+GitHub direct MCP, Railway, ElevenLabs, and Docker remain separate provider adapters for subsequent rollout. GitHub is already usable indirectly by Workers Builds for repository-backed Worker build/deploy once its Cloudflare GitHub installation is connected.
