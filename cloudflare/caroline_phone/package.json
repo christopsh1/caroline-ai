@@ -9,6 +9,9 @@
     "check": "npm run typecheck && npm test",
     "deploy": "wrangler deploy"
   },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.2"
+  },
   "devDependencies": {
     "@types/node": "^24.5.2",
     "tsx": "^4.20.5",
