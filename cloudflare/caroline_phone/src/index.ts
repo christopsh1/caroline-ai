@@ -7,8 +7,10 @@ export { CallSession } from './call-session'
 export type Env = {
   TWILIO_AUTH_TOKEN: string
   ELEVENLABS_API_KEY: string
-  ELEVENLABS_AGENT_ID: string
-  ELEVENLABS_BRANCH_ID?: string
+  ELEVENLABS_INBOUND_AGENT_ID: string
+  ELEVENLABS_OUTBOUND_AGENT_ID: string
+  ELEVENLABS_INBOUND_BRANCH_ID?: string
+  ELEVENLABS_OUTBOUND_BRANCH_ID?: string
   CALL_SESSION: CallSessionBinding
 }
 
@@ -123,6 +125,8 @@ export default {
         service: 'caroline-phone',
         canonical_context: 'pending_neon',
         telephony_control: 'cloudflare',
+        inbound_agent_configured: Boolean(env.ELEVENLABS_INBOUND_AGENT_ID),
+        outbound_agent_configured: Boolean(env.ELEVENLABS_OUTBOUND_AGENT_ID),
       })
     }
 
