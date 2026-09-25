@@ -8,7 +8,6 @@ EXPOSE 8811
 
 CMD ["sh", "-c", "supergateway \\
   --port 8811 \\
-  --bearer-token ${MCP_GATEWAY_AUTH_TOKEN} \\
   --server github:https://api.githubcopilot.com/mcp \\
   --server cloudflare:https://bindings.mcp.cloudflare.com/mcp \\
   --server elevenlabs:https://api.elevenlabs.io/v1/mcp \\
