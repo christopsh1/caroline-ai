@@ -37,16 +37,40 @@ jobs:
         working-directory: services/caroline-mcp
         run: npm run check
 
-  deploy:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+  infisical-smoke:
     needs: validate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Load deployment credentials from Infisical
-        uses: Infisical/secrets-action@v1.0.17
+      - name: Load credentials from Infisical with GitHub OIDC
+        uses: Infisical/secrets-action@v1
+        with:
+          method: oidc
+          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
+          project-slug: ${{ vars.INFISICAL_PROJECT_SLUG }}
+          env-slug: ${{ vars.INFISICAL_ENV_SLUG }}
+          secret-path: ${{ vars.INFISICAL_SECRET_PATH }}
+          domain: https://app.infisical.com
+
+      - name: Verify Infisical and Cloudflare access
+        working-directory: services/caroline-mcp
+        env:
+          GITHUB_FALLBACK_CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GITHUB_FALLBACK_CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/bootstrap-ci.mjs --check
+
+  deploy:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: [validate, infisical-smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Load credentials from Infisical with GitHub OIDC
+        uses: Infisical/secrets-action@v1
         with:
           method: oidc
           identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
@@ -64,6 +88,21 @@ jobs:
         working-directory: services/caroline-mcp
         run: npm install --no-audit --no-fund
 
-      - name: Deploy to Cloudflare
+      - name: Bootstrap Caroline MCP credentials
+        working-directory: services/caroline-mcp
+        env:
+          INFISICAL_IDENTITY_ID: ${{ vars.INFISICAL_IDENTITY_ID }}
+          INFISICAL_PROJECT_ID: 4643c8b4-eb45-45dd-87e4-80cdec6aea6a
+          INFISICAL_ENV_SLUG: ${{ vars.INFISICAL_ENV_SLUG }}
+          INFISICAL_SECRET_PATH: ${{ vars.INFISICAL_SECRET_PATH }}
+          GITHUB_FALLBACK_CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GITHUB_FALLBACK_CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/bootstrap-ci.mjs
+
+      - name: Deploy caroline-mcp code
         working-directory: services/caroline-mcp
         run: npx wrangler deploy
+
+      - name: Provision caroline-mcp runtime secrets
+        working-directory: services/caroline-mcp
+        run: node scripts/runtime-secrets-json.mjs | npx wrangler secret bulk
