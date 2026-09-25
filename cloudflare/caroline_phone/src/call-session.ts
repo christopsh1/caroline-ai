@@ -8,7 +8,7 @@ export type CallSessionState = {
   elevenlabs_conversation_id?: string
   from_number?: string
   to_number?: string
-  register_status?: 'registering' | 'registered' | 'register_failed'
+  register_status?: 'pending' | 'registering' | 'registered' | 'register_failed'
   call_status?: string
   answered_by?: string
   registered_at?: string
@@ -93,18 +93,35 @@ export async function getCallSession(binding: CallSessionBinding, key: string): 
 export async function createCallMapping(
   binding: CallSessionBinding,
   state: Omit<CallSessionState, 'created_at' | 'updated_at'>,
-): Promise<void> {
-  await writeState(binding, state.call_sid, state)
-  await writeState(binding, state.call_context_id, state)
+): Promise<CallSessionState> {
+  const existing = await getCallSession(binding, state.call_sid)
+  const canonical = existing ?? (await writeState(binding, state.call_sid, state))
+  await writeState(binding, canonical.call_context_id, canonical)
+  return canonical
+}
+
+async function mirrorState(binding: CallSessionBinding, current: CallSessionState, patch: Partial<CallSessionState>): Promise<CallSessionState> {
+  const next = await writeState(binding, current.call_sid, { ...current, ...patch })
+  await writeState(binding, next.call_context_id, next)
+  return next
 }
 
 export async function patchCallSession(
   binding: CallSessionBinding,
   callSid: string,
   patch: Partial<CallSessionState>,
-): Promise<void> {
+): Promise<CallSessionState> {
   const current = await getCallSession(binding, callSid)
   if (!current) throw new Error('call_session_not_found')
-  const next = await writeState(binding, callSid, { ...current, ...patch })
-  await writeState(binding, next.call_context_id, next)
+  return mirrorState(binding, current, patch)
+}
+
+export async function patchCallSessionByContext(
+  binding: CallSessionBinding,
+  callContextId: string,
+  patch: Partial<CallSessionState>,
+): Promise<CallSessionState> {
+  const current = await getCallSession(binding, callContextId)
+  if (!current) throw new Error('call_context_not_found')
+  return mirrorState(binding, current, patch)
 }
