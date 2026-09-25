@@ -2,6 +2,11 @@ name: Deploy caroline-phone
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'cloudflare/caroline_phone/**'
+      - '.github/workflows/deploy-caroline-phone.yml'
 
 permissions:
   contents: read
