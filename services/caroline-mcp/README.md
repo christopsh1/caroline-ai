@@ -64,6 +64,8 @@ and receives the control token as a bearer token. That upstream exposes Cloudfla
 
 The repository workflow `.github/workflows/deploy-caroline-mcp.yml` deploys only this service when files under `services/caroline-mcp/**` change. It reuses the repository's existing GitHub Actions deployment credentials to deploy the Worker, but it does not copy those credentials into the running Worker.
 
+The service is independently named `caroline-mcp`, so its deployment is isolated from the existing `caroline-ai` and `caroline-event-worker` Workers.
+
 Set the gateway secret:
 
 ```bash
