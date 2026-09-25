@@ -44,6 +44,17 @@ async function signedFormRequest(url: string, values: Record<string, string>): P
   return new Request(url, {
     method: 'POST',
     headers: {
+      'content-type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  })
+}
+
+async function signedTwilioRequest(url: string, values: Record<string, string>): Promise<Request> {
+  const params = new URLSearchParams(values)
+  const signature = await expectedTwilioSignature(TWILIO_TOKEN, url, params)
+  return new Request(url, {
+    method: 'POST',
+    headers: {
       'content-type': 'application/x-www-form-urlencoded',
       'x-twilio-signature': signature,
     },
@@ -68,17 +79,17 @@ test('matches Twilio official HMAC-SHA1 form vector', async () => {
 
 test('rejects an unsigned Twilio route before state or ElevenLabs work', async () => {
   const store = makeDoBinding()
-  const request = new Request('https://phone.example/twilio/inbound', {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: 'CallSid=CA1&From=%2B15550000001&To=%2B15550000002',
+  const request = await signedFormRequest('https://phone.example/twilio/inbound', {
+    CallSid: 'CA1',
+    From: '+15550000001',
+    To: '+15550000002',
   })
   const response = await worker.fetch(request, makeEnv(store.binding))
   assert.equal(response.status, 403)
   assert.equal(store.patches.length, 0)
 })
 
-test('inbound verifies Twilio, registers with the inbound ElevenLabs runtime, and persists state', async () => {
+test('inbound registers correct runtime and complete compact safe call-start context', async () => {
   const store = makeDoBinding()
   const previousFetch = globalThis.fetch
   let registerBody: any = null
@@ -88,7 +99,7 @@ test('inbound verifies Twilio, registers with the inbound ElevenLabs runtime, an
   }) as typeof fetch
 
   try {
-    const request = await signedFormRequest('https://phone.example/twilio/inbound', {
+    const request = await signedTwilioRequest('https://phone.example/twilio/inbound', {
       CallSid: 'CA_INBOUND',
       From: '+15550000001',
       To: '+15550000002',
@@ -99,7 +110,17 @@ test('inbound verifies Twilio, registers with the inbound ElevenLabs runtime, an
     assert.equal(registerBody.direction, 'inbound')
     assert.equal(registerBody.agent_id, 'agent_inbound')
     assert.equal(registerBody.conversation_initiation_client_data.branch_id, 'agtbrch_inbound_main')
+
     const vars = registerBody.conversation_initiation_client_data.dynamic_variables
+    assert.equal(vars.call_mode, 'inbound')
+    assert.equal(vars.caller_name, 'there')
+    assert.equal(vars.relationship_summary, 'No prior context is available.')
+    assert.equal(vars.access_tier, 'tier_0_unknown_unverified')
+    assert.equal(vars.call_objective, 'Assist within approved capabilities.')
+    assert.equal(vars.approved_context, 'No additional context is available.')
+    assert.equal(vars.voicemail_detected, false)
+    assert.equal(vars.secret__contact_id, '')
+    assert.equal(vars.secret__call_session_id, 'CA_INBOUND')
     assert.equal(vars.caller_access_tier, 'tier_0_unknown_unverified')
     assert.equal(vars.caller_identity_status, 'unknown')
     assert.equal(vars.calendar_share_level, 'none')
@@ -111,7 +132,7 @@ test('inbound verifies Twilio, registers with the inbound ElevenLabs runtime, an
   }
 })
 
-test('outbound registers with the dedicated outbound ElevenLabs runtime', async () => {
+test('outbound registers dedicated runtime and direction-specific context', async () => {
   const store = makeDoBinding()
   const previousFetch = globalThis.fetch
   let registerBody: any = null
@@ -121,7 +142,7 @@ test('outbound registers with the dedicated outbound ElevenLabs runtime', async 
   }) as typeof fetch
 
   try {
-    const request = await signedFormRequest('https://phone.example/twilio/outbound', {
+    const request = await signedTwilioRequest('https://phone.example/twilio/outbound', {
       CallSid: 'CA_OUTBOUND',
       From: '+15550000002',
       To: '+15550000003',
@@ -131,6 +152,9 @@ test('outbound registers with the dedicated outbound ElevenLabs runtime', async 
     assert.equal(registerBody.direction, 'outbound')
     assert.equal(registerBody.agent_id, 'agent_outbound')
     assert.equal(registerBody.conversation_initiation_client_data.branch_id, 'agtbrch_outbound_main')
+    const vars = registerBody.conversation_initiation_client_data.dynamic_variables
+    assert.equal(vars.call_mode, 'outbound')
+    assert.equal(vars.secret__call_session_id, 'CA_OUTBOUND')
   } finally {
     globalThis.fetch = previousFetch
   }
@@ -140,14 +164,14 @@ test('status and AMD callbacks update the per-call Durable Object', async () => 
   const store = makeDoBinding()
   const env = makeEnv(store.binding)
 
-  const statusRequest = await signedFormRequest('https://phone.example/twilio/status', {
+  const statusRequest = await signedTwilioRequest('https://phone.example/twilio/status', {
     CallSid: 'CA_STATE',
     CallStatus: 'answered',
   })
   const statusResponse = await worker.fetch(statusRequest, env)
   assert.equal(statusResponse.status, 204)
 
-  const amdRequest = await signedFormRequest('https://phone.example/twilio/amd', {
+  const amdRequest = await signedTwilioRequest('https://phone.example/twilio/amd', {
     CallSid: 'CA_STATE',
     AnsweredBy: 'human',
   })
