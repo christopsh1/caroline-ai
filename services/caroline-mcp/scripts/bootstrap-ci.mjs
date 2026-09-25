@@ -5,7 +5,6 @@ import { createHmac, randomBytes } from "node:crypto";
 const env = process.env;
 const checkOnly = process.argv.includes("--check");
 const CF_API = "https://api.cloudflare.com/client/v4";
-const INFISICAL = "https://app.infisical.com";
 
 function nonempty(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
@@ -113,7 +112,7 @@ async function chooseCloudflareAuth() {
     if (whoami) return { ...auth, accounts: whoami.accounts };
   }
 
-  throw new Error("No usable Cloudflare Workers credential was found in Infisical or the existing GitHub deployment credential");
+  throw new Error("No usable Cloudflare Workers deployment credential was found");
 }
 
 async function workerExists(accountId, auth) {
@@ -150,64 +149,6 @@ async function resolveAccountId(auth) {
   throw new Error("Cloudflare authenticated successfully, but the account containing caroline-mcp could not be resolved");
 }
 
-async function infisicalAccessToken() {
-  const requestUrl = nonempty(env.ACTIONS_ID_TOKEN_REQUEST_URL);
-  const requestToken = nonempty(env.ACTIONS_ID_TOKEN_REQUEST_TOKEN);
-  const identityId = nonempty(env.INFISICAL_IDENTITY_ID);
-  if (!requestUrl || !requestToken || !identityId) throw new Error("GitHub OIDC context for Infisical is unavailable");
-
-  const oidcResponse = await fetch(requestUrl, {
-    headers: { Authorization: `Bearer ${requestToken}`, Accept: "application/json" },
-  });
-  if (!oidcResponse.ok) throw new Error(`GitHub OIDC token request failed with HTTP ${oidcResponse.status}`);
-  const oidcBody = await oidcResponse.json();
-  const jwt = nonempty(oidcBody?.value);
-  if (!jwt) throw new Error("GitHub OIDC response did not contain a token");
-
-  const login = new URLSearchParams({ identityId, jwt });
-  const infResponse = await fetch(`${INFISICAL}/api/v1/auth/oidc-auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    body: login,
-  });
-  if (!infResponse.ok) throw new Error(`Infisical OIDC login failed with HTTP ${infResponse.status}`);
-  const infBody = await infResponse.json();
-  const token = nonempty(infBody?.accessToken);
-  if (!token) throw new Error("Infisical OIDC login returned no access token");
-  mask(token);
-  return token;
-}
-
-async function persistGatewayToken(value) {
-  const projectId = nonempty(env.INFISICAL_PROJECT_ID);
-  const environment = nonempty(env.INFISICAL_ENV_SLUG) ?? "dev";
-  const secretPath = nonempty(env.INFISICAL_SECRET_PATH) ?? "/";
-  if (!projectId) throw new Error("INFISICAL_PROJECT_ID is unavailable for MCP token persistence");
-
-  const accessToken = await infisicalAccessToken();
-  const response = await fetch(`${INFISICAL}/api/v3/secrets/raw/MCP_GATEWAY_TOKEN`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      workspaceId: projectId,
-      environment,
-      type: "shared",
-      secretPath,
-      secretKey: "MCP_GATEWAY_TOKEN",
-      secretValue: value,
-      secretComment: "Generated automatically for the Caroline MCP gateway",
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Infisical secret write failed with HTTP ${response.status}`);
-  }
-}
-
 const auth = await chooseCloudflareAuth();
 const accountId = await resolveAccountId(auth);
 console.log(`Cloudflare authentication verified (${auth.kind}; source=${auth.source}).`);
@@ -237,14 +178,8 @@ if (!gatewayToken) {
     .update("caroline-mcp-gateway-token/v1", "utf8")
     .digest("base64url");
   mask(gatewayToken);
-
-  try {
-    await persistGatewayToken(gatewayToken);
-    console.log("Generated MCP gateway bearer token and stored it in Infisical.");
-  } catch {
-    console.log("Infisical OIDC write-back is unavailable; continuing with the stable generated gateway token.");
-  }
+  console.log("Using stable generated MCP gateway bearer token.");
 } else {
-  console.log("Using existing MCP gateway bearer token from Infisical.");
+  console.log("Using configured MCP gateway bearer token.");
 }
 exportEnv("MCP_GATEWAY_TOKEN", gatewayToken);
