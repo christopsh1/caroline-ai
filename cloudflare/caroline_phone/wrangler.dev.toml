@@ -1,0 +1,40 @@
+name = "caroline-phone-dev"
+main = "src/index.ts"
+compatibility_date = "2026-09-23"
+account_id = "882fc7501e4632c7c58879d5c1d5b672"
+workers_dev = true
+
+[observability]
+enabled = true
+
+[vars]
+ENVIRONMENT = "development"
+ELEVENLABS_INBOUND_AGENT_ID = "agent_8001m2ba4rmder6t7wq270ntj43j"
+ELEVENLABS_OUTBOUND_AGENT_ID = "agent_0501m31c1xv6e40ayeab7bn67vet"
+CALL_CONTEXT_TTL_SECONDS = "7200"
+
+[[durable_objects.bindings]]
+name = "CALL_SESSION"
+class_name = "CallSession"
+
+[[durable_objects.bindings]]
+name = "EVENT_LEDGER"
+class_name = "EventLedger"
+
+[[queues.producers]]
+binding = "POST_CALL_QUEUE"
+queue = "caroline-post-call-dev"
+
+[[queues.consumers]]
+queue = "caroline-post-call-dev"
+max_batch_size = 5
+max_batch_timeout = 5
+max_retries = 5
+
+[exports.CallSession]
+type = "durable-object"
+storage = "sqlite"
+
+[exports.EventLedger]
+type = "durable-object"
+storage = "sqlite"
