@@ -55,8 +55,11 @@ jobs:
             set -a
             source /tmp/infisical-caroline-event-worker.env
             set +a
+          elif [[ -z "${INFISICAL_TOKEN:-}" && -z "${INFISICAL_PROJECT_ID:-}" ]]; then
+            echo "INFISICAL_TOKEN and INFISICAL_PROJECT_ID not set; using GitHub secrets/variables fallback."
           else
-            echo "INFISICAL_TOKEN or INFISICAL_PROJECT_ID not set; using GitHub secrets/variables fallback."
+            echo "Incomplete Infisical configuration: set both INFISICAL_TOKEN and INFISICAL_PROJECT_ID, or neither." >&2
+            exit 1
           fi
           required=(
             CLOUDFLARE_API_TOKEN
