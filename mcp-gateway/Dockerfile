@@ -1,7 +1,16 @@
-FROM docker/mcp-gateway@sha256:f5a679a05fc39022a046167bef92aeeb01bcd59485ad27843ae5227db7950688
+FROM node:20-alpine
+
+WORKDIR /app
+
+RUN npm install -g supergateway
 
 EXPOSE 8811
 
-# MCP_GATEWAY_AUTH_TOKEN is read by the gateway for bearer-token auth.
-ENTRYPOINT ["/docker-mcp", "gateway", "run"]
-CMD ["--transport=sse", "--host=0.0.0.0", "--port=8811", "--servers=github", "--servers=cloudflare", "--servers=elevenlabs", "--servers=supabase", "--servers=neon"]
+CMD ["sh", "-c", "supergateway \\
+  --port 8811 \\
+  --bearer-token ${MCP_GATEWAY_AUTH_TOKEN} \\
+  --server github:https://api.githubcopilot.com/mcp \\
+  --server cloudflare:https://bindings.mcp.cloudflare.com/mcp \\
+  --server elevenlabs:https://api.elevenlabs.io/v1/mcp \\
+  --server supabase:https://mcp.supabase.com/mcp \\
+  --server neon:https://mcp.neon.tech/sse"]
