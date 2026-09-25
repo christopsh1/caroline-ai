@@ -7,6 +7,9 @@ workers_dev = true
 [observability]
 enabled = true
 
+[vars]
+SUPABASE_EVENT_INGEST_URL = ""
+
 [[kv_namespaces]]
 binding = "CAROLINE_PHONE"
 id = "85679a0030e846ee931226aa1a6e6332"
@@ -38,6 +41,7 @@ queue = "caroline-event-delivery"
 
 [[queues.consumers]]
 queue = "caroline-event-delivery"
+dead_letter_queue = "caroline-event-dlq"
 max_batch_size = 10
 max_batch_timeout = 5
 max_retries = 3
