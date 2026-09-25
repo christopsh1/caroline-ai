@@ -127,6 +127,8 @@ export default {
         telephony_control: 'cloudflare',
         inbound_agent_configured: Boolean(env.ELEVENLABS_INBOUND_AGENT_ID),
         outbound_agent_configured: Boolean(env.ELEVENLABS_OUTBOUND_AGENT_ID),
+        elevenlabs_secret_configured: Boolean(env.ELEVENLABS_API_KEY),
+        twilio_secret_configured: Boolean(env.TWILIO_AUTH_TOKEN),
       })
     }
 
