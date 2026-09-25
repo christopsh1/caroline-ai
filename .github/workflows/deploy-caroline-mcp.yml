@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Load credentials from Infisical with GitHub OIDC
-        uses: Infisical/secrets-action@v1
+        uses: Infisical/secrets-action@v1.0.17
         with:
           method: oidc
           identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
@@ -70,7 +70,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Load credentials from Infisical with GitHub OIDC
-        uses: Infisical/secrets-action@v1
+        uses: Infisical/secrets-action@v1.0.17
         with:
           method: oidc
           identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
