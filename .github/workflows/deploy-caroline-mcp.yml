@@ -87,3 +87,7 @@ jobs:
           if (health.workers_builds_configured !== true) throw new Error('Workers Builds is not configured');
           console.log(`caroline-mcp live health verified: version=${health.version}, environment=${health.environment}`);
           NODE
+
+      - name: Verify live Cloudflare MCP tool discovery
+        working-directory: services/caroline-mcp
+        run: node scripts/verify-live-tools.mjs
