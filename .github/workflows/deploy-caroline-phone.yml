@@ -31,16 +31,27 @@ jobs:
         working-directory: cloudflare/caroline_phone
         run: npm run check
 
-      - name: Deploy caroline-phone
+      - name: Deploy caroline-phone without replacing runtime secrets
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: cloudflare/caroline_phone
           command: deploy
-          secrets: |
-            ELEVENLABS_API_KEY
-            TWILIO_AUTH_TOKEN
-        env:
-          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+
+      - name: Verify live phone runtime readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          health_file="$(mktemp)"
+          curl --fail --silent --show-error --retry 8 --retry-delay 2 \
+            https://caroline-phone.customerservice-882.workers.dev/health \
+            > "$health_file"
+          node - "$health_file" <<'NODE'
+          const fs = require('fs');
+          const health = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (health.service !== 'caroline-phone') throw new Error('unexpected service');
+          if (health.inbound_agent_configured !== true) throw new Error('inbound ElevenLabs runtime not configured');
+          if (health.outbound_agent_configured !== true) throw new Error('outbound ElevenLabs runtime not configured');
+          console.log(`caroline-phone deployed: elevenlabs_secret=${health.elevenlabs_secret_configured}, twilio_secret=${health.twilio_secret_configured}`);
+          NODE
