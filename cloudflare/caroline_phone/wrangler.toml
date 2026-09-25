@@ -8,10 +8,11 @@ workers_dev = true
 enabled = true
 
 [vars]
+ENVIRONMENT = "production"
 ELEVENLABS_INBOUND_AGENT_ID = "agent_8001m2ba4rmder6t7wq270ntj43j"
-ELEVENLABS_INBOUND_BRANCH_ID = "agtbrch_0301m2ba4v10exarksax30ye678x"
 ELEVENLABS_OUTBOUND_AGENT_ID = "agent_0501m31c1xv6e40ayeab7bn67vet"
-ELEVENLABS_OUTBOUND_BRANCH_ID = "agtbrch_0201m31c1xvhfajthtqjs8p1wqpb"
+CAROLINE_PHONE_PUBLIC_URL = "https://caroline-phone.customerservice-882.workers.dev"
+CALL_CONTEXT_TTL_SECONDS = "7200"
 
 [[durable_objects.bindings]]
 name = "CALL_SESSION"
@@ -21,6 +22,16 @@ class_name = "CallSession"
 name = "EVENT_LEDGER"
 class_name = "EventLedger"
 
+[[queues.producers]]
+binding = "POST_CALL_QUEUE"
+queue = "caroline-post-call"
+
+[[queues.consumers]]
+queue = "caroline-post-call"
+max_batch_size = 5
+max_batch_timeout = 5
+max_retries = 5
+
 [exports.CallSession]
 type = "durable-object"
 storage = "sqlite"
@@ -28,7 +39,3 @@ storage = "sqlite"
 [exports.EventLedger]
 type = "durable-object"
 storage = "sqlite"
-
-# Add POST_CALL_QUEUE as a producer binding only after a dedicated post-call
-# consumer exists. Do not point this at the generic event-delivery consumer,
-# which currently only marks pre-stored events delivered.
