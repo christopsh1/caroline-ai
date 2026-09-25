@@ -2,6 +2,18 @@ export type CallDirection = 'inbound' | 'outbound'
 export type DynamicValue = string | number | boolean
 
 export const SAFE_DYNAMIC_DEFAULTS: Record<string, DynamicValue> = {
+  // Compact phone-runtime contract consumed directly by the active ElevenLabs prompts.
+  call_mode: 'inbound',
+  caller_name: 'there',
+  relationship_summary: 'No prior context is available.',
+  access_tier: 'tier_0_unknown_unverified',
+  call_objective: 'Assist within approved capabilities.',
+  approved_context: 'No additional context is available.',
+  voicemail_detected: false,
+  secret__contact_id: '',
+  secret__call_session_id: '',
+
+  // Canonical context surface retained for policy/retrieval migration and tools.
   caroline_context_json: '',
   caller_access_tier: 'tier_0_unknown_unverified',
   caller_tone_profile: 'professional',
@@ -51,6 +63,8 @@ export async function buildCallStartVariables(input: {
 }): Promise<Record<string, DynamicValue>> {
   const variables: Record<string, DynamicValue> = {
     ...SAFE_DYNAMIC_DEFAULTS,
+    call_mode: input.direction,
+    secret__call_session_id: input.call_sid,
     caroline_context_json: JSON.stringify({
       source: 'cloudflare_phone',
       call_sid: input.call_sid,
