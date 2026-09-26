@@ -11,6 +11,65 @@ import { claimEvent, EventLedger, releaseEvent, type EventLedgerBinding } from '
 import { handleElevenLabsTool } from './tools'
 import { verifyTwilioFormRequest } from './twilio-security'
 
+// Caroline secrets bootstrap.
+// Cloudflare secret bindings permitted on this Worker: GATEWAY_TOKEN and GATEWAY_URL only.
+// Provider/application credentials are resolved from Infisical through secrets-gateway.
+type RuntimeSecrets = {
+  TWILIO_ACCOUNT_SID?: string
+  TWILIO_AUTH_TOKEN?: string
+  TWILIO_FROM_NUMBER?: string
+  OUTBOUND_ADMIN_TOKEN?: string
+  ELEVENLABS_API_KEY?: string
+  ELEVENLABS_TOOL_SECRET?: string
+  ELEVENLABS_WEBHOOK_SECRET?: string
+  ACTION_CONFIRMATION_SECRET?: string
+  CAROLINE_BACKEND_TOKEN?: string
+}
+
+type SecretsGatewayResponse = {
+  ok?: unknown
+  error?: unknown
+  secrets?: unknown
+}
+
+const SECRETS_CACHE_TTL_MS = 5 * 60 * 1000
+let _secrets: RuntimeSecrets | null = null
+let _secretsExpiresAt = 0
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+}
+
+async function getSecrets(env: Env): Promise<RuntimeSecrets> {
+  const now = Date.now()
+  if (_secrets && now < _secretsExpiresAt) return _secrets
+  if (!env.GATEWAY_URL || !env.GATEWAY_TOKEN || !env.WORKER_NAME) {
+    throw new Error('secrets_gateway_not_configured')
+  }
+
+  const resp = await fetch(
+    `${env.GATEWAY_URL.replace(/\/+$/, '')}/secrets?worker=${encodeURIComponent(env.WORKER_NAME)}`,
+    { headers: { Authorization: `Bearer ${env.GATEWAY_TOKEN}` } },
+  )
+  if (!resp.ok) throw new Error(`Secrets gateway error: ${resp.status}`)
+
+  const data = (await resp.json()) as SecretsGatewayResponse
+  if (data.ok !== true) {
+    throw new Error(`Secrets gateway: ${typeof data.error === 'string' ? data.error : 'unknown_error'}`)
+  }
+  if (!isRecord(data.secrets)) throw new Error('secrets_gateway_invalid_payload')
+
+  const resolved: RuntimeSecrets = {}
+  for (const key of Object.keys(data.secrets) as Array<keyof RuntimeSecrets>) {
+    const value = data.secrets[key]
+    if (typeof value === 'string') resolved[key] = value
+  }
+
+  _secrets = resolved
+  _secretsExpiresAt = now + SECRETS_CACHE_TTL_MS
+  return resolved
+}
+
 export { CallSession } from './call-session'
 export { EventLedger }
 
@@ -37,16 +96,10 @@ type PostCallQueueMessage = {
 }
 
 export type Env = {
-  TWILIO_ACCOUNT_SID?: string
-  TWILIO_AUTH_TOKEN?: string
-  TWILIO_FROM_NUMBER?: string
-  OUTBOUND_ADMIN_TOKEN?: string
-  ELEVENLABS_API_KEY?: string
-  ELEVENLABS_TOOL_SECRET?: string
-  ELEVENLABS_WEBHOOK_SECRET?: string
-  ACTION_CONFIRMATION_SECRET?: string
+  GATEWAY_TOKEN?: string
+  GATEWAY_URL?: string
+  WORKER_NAME: string
   CAROLINE_BACKEND_URL?: string
-  CAROLINE_BACKEND_TOKEN?: string
   CAROLINE_PHONE_PUBLIC_URL?: string
   CALL_CONTEXT_TTL_SECONDS?: string
   ENVIRONMENT?: string
@@ -55,6 +108,24 @@ export type Env = {
   CALL_SESSION: CallSessionBinding
   EVENT_LEDGER?: EventLedgerBinding
   POST_CALL_QUEUE?: QueueBinding
+}
+
+type RuntimeEnv = Env & RuntimeSecrets
+
+async function hydrateEnv(env: Env): Promise<RuntimeEnv> {
+  const secrets = await getSecrets(env)
+  return {
+    ...env,
+    TWILIO_ACCOUNT_SID: secrets.TWILIO_ACCOUNT_SID,
+    TWILIO_AUTH_TOKEN: secrets.TWILIO_AUTH_TOKEN,
+    TWILIO_FROM_NUMBER: secrets.TWILIO_FROM_NUMBER,
+    OUTBOUND_ADMIN_TOKEN: secrets.OUTBOUND_ADMIN_TOKEN,
+    ELEVENLABS_API_KEY: secrets.ELEVENLABS_API_KEY,
+    ELEVENLABS_TOOL_SECRET: secrets.ELEVENLABS_TOOL_SECRET,
+    ELEVENLABS_WEBHOOK_SECRET: secrets.ELEVENLABS_WEBHOOK_SECRET,
+    ACTION_CONFIRMATION_SECRET: secrets.ACTION_CONFIRMATION_SECRET,
+    CAROLINE_BACKEND_TOKEN: secrets.CAROLINE_BACKEND_TOKEN,
+  }
 }
 
 const FALLBACK_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response><Say>Sorry, this line is temporarily unavailable.</Say><Hangup/></Response>'
@@ -100,7 +171,7 @@ function validOpaqueContext(value: string | null): string | null {
   return /^[A-Za-z0-9_-]{20,128}$/.test(value) ? value : null
 }
 
-async function verifiedTwilioForm(request: Request, env: Env): Promise<{ raw: string; params: URLSearchParams } | null> {
+async function verifiedTwilioForm(request: Request, env: RuntimeEnv): Promise<{ raw: string; params: URLSearchParams } | null> {
   if (!env.TWILIO_AUTH_TOKEN) return null
   const raw = await request.text()
   const valid = await verifyTwilioFormRequest(request, raw, env.TWILIO_AUTH_TOKEN)
@@ -108,7 +179,7 @@ async function verifiedTwilioForm(request: Request, env: Env): Promise<{ raw: st
   return { raw, params: new URLSearchParams(raw) }
 }
 
-async function handleVoice(request: Request, env: Env, direction: 'inbound' | 'outbound'): Promise<Response> {
+async function handleVoice(request: Request, env: RuntimeEnv, direction: 'inbound' | 'outbound'): Promise<Response> {
   const verified = await verifiedTwilioForm(request, env)
   if (!verified) return json({ error: 'forbidden' }, 403)
   if (!env.ELEVENLABS_API_KEY) return xml(FALLBACK_TWIML)
@@ -168,7 +239,7 @@ async function handleVoice(request: Request, env: Env, direction: 'inbound' | 'o
   }
 }
 
-function outboundAdminAuthorized(request: Request, env: Env): boolean {
+function outboundAdminAuthorized(request: Request, env: RuntimeEnv): boolean {
   return Boolean(env.OUTBOUND_ADMIN_TOKEN && request.headers.get('authorization') === `Bearer ${env.OUTBOUND_ADMIN_TOKEN}`)
 }
 
@@ -178,7 +249,7 @@ function e164(value: unknown): string | null {
   return /^\+[1-9]\d{7,14}$/.test(trimmed) ? trimmed : null
 }
 
-async function handleOutboundAdmin(request: Request, env: Env): Promise<Response> {
+async function handleOutboundAdmin(request: Request, env: RuntimeEnv): Promise<Response> {
   if (!outboundAdminAuthorized(request, env)) return json({ ok: false, error: 'unauthorized' }, 401)
   if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_FROM_NUMBER) {
     return json({ ok: false, error: 'twilio_outbound_not_configured' }, 503)
@@ -253,7 +324,7 @@ async function handleOutboundAdmin(request: Request, env: Env): Promise<Response
   return json({ ok: true, call_context_id: callContextId, call_sid: callSid, status: twilioBody.status ?? 'queued' }, 202)
 }
 
-async function handleStatus(request: Request, env: Env): Promise<Response> {
+async function handleStatus(request: Request, env: RuntimeEnv): Promise<Response> {
   const verified = await verifiedTwilioForm(request, env)
   if (!verified) return json({ error: 'forbidden' }, 403)
 
@@ -269,7 +340,7 @@ async function handleStatus(request: Request, env: Env): Promise<Response> {
   }
 }
 
-async function handleAmd(request: Request, env: Env): Promise<Response> {
+async function handleAmd(request: Request, env: RuntimeEnv): Promise<Response> {
   const verified = await verifiedTwilioForm(request, env)
   if (!verified) return json({ error: 'forbidden' }, 403)
 
@@ -303,7 +374,7 @@ function extractTwilioCallSid(event: any): string | undefined {
   return candidates.find((value) => typeof value === 'string' && value.length > 5)
 }
 
-async function handlePostCall(request: Request, env: Env): Promise<Response> {
+async function handlePostCall(request: Request, env: RuntimeEnv): Promise<Response> {
   if (!env.ELEVENLABS_WEBHOOK_SECRET || !env.EVENT_LEDGER || !env.POST_CALL_QUEUE) {
     return json({ ok: false, error: 'post_call_not_configured' }, 503)
   }
@@ -367,7 +438,7 @@ async function handlePostCall(request: Request, env: Env): Promise<Response> {
   return json({ ok: true, queued: true })
 }
 
-async function processPostCallMessage(message: PostCallQueueMessage, env: Env): Promise<void> {
+async function processPostCallMessage(message: PostCallQueueMessage, env: RuntimeEnv): Promise<void> {
   if (!env.ELEVENLABS_API_KEY || !env.CAROLINE_BACKEND_URL || !env.CAROLINE_BACKEND_TOKEN) {
     throw new Error('post_call_consumer_not_configured')
   }
@@ -393,6 +464,19 @@ async function processPostCallMessage(message: PostCallQueueMessage, env: Env): 
 }
 
 async function health(env: Env): Promise<Response> {
+  let runtime: RuntimeEnv
+  try {
+    runtime = await hydrateEnv(env)
+  } catch {
+    return json({
+      ok: false,
+      service: 'caroline-phone',
+      environment: env.ENVIRONMENT ?? 'development',
+      secrets_gateway_configured: Boolean(env.GATEWAY_URL && env.GATEWAY_TOKEN && env.WORKER_NAME),
+      secrets_gateway_reachable: false,
+    }, 503)
+  }
+
   return json({
     ok: true,
     service: 'caroline-phone',
@@ -400,16 +484,27 @@ async function health(env: Env): Promise<Response> {
     conversational_runtime: 'elevenlabs-native',
     live_model_proxy: false,
     openrouter_live_path: false,
-    inbound_agent_configured: Boolean(env.ELEVENLABS_INBOUND_AGENT_ID),
-    outbound_agent_configured: Boolean(env.ELEVENLABS_OUTBOUND_AGENT_ID),
-    elevenlabs_api_secret_configured: Boolean(env.ELEVENLABS_API_KEY),
-    twilio_secret_configured: Boolean(env.TWILIO_AUTH_TOKEN),
-    outbound_trigger_configured: Boolean(env.TWILIO_ACCOUNT_SID && env.TWILIO_FROM_NUMBER && env.OUTBOUND_ADMIN_TOKEN),
-    tool_auth_configured: Boolean(env.ELEVENLABS_TOOL_SECRET),
-    backend_configured: Boolean(env.CAROLINE_BACKEND_URL && env.CAROLINE_BACKEND_TOKEN),
-    confirmation_secret_configured: Boolean(env.ACTION_CONFIRMATION_SECRET),
-    post_call_webhook_configured: Boolean(env.ELEVENLABS_WEBHOOK_SECRET && env.EVENT_LEDGER && env.POST_CALL_QUEUE),
+    secrets_gateway_configured: true,
+    secrets_gateway_reachable: true,
+    inbound_agent_configured: Boolean(runtime.ELEVENLABS_INBOUND_AGENT_ID),
+    outbound_agent_configured: Boolean(runtime.ELEVENLABS_OUTBOUND_AGENT_ID),
+    elevenlabs_api_secret_configured: Boolean(runtime.ELEVENLABS_API_KEY),
+    twilio_secret_configured: Boolean(runtime.TWILIO_AUTH_TOKEN),
+    outbound_trigger_configured: Boolean(runtime.TWILIO_ACCOUNT_SID && runtime.TWILIO_FROM_NUMBER && runtime.OUTBOUND_ADMIN_TOKEN),
+    tool_auth_configured: Boolean(runtime.ELEVENLABS_TOOL_SECRET),
+    backend_configured: Boolean(runtime.CAROLINE_BACKEND_URL && runtime.CAROLINE_BACKEND_TOKEN),
+    confirmation_secret_configured: Boolean(runtime.ACTION_CONFIRMATION_SECRET),
+    post_call_webhook_configured: Boolean(runtime.ELEVENLABS_WEBHOOK_SECRET && runtime.EVENT_LEDGER && runtime.POST_CALL_QUEUE),
   })
+}
+
+function knownPostRoute(pathname: string): boolean {
+  return pathname === '/twilio/inbound'
+    || pathname === '/twilio/outbound'
+    || pathname === '/twilio/status'
+    || pathname === '/twilio/amd'
+    || pathname === '/elevenlabs/webhooks/post-call'
+    || TOOL_ROUTES.has(pathname)
 }
 
 export default {
@@ -418,27 +513,45 @@ export default {
 
     if (request.method === 'GET' && url.pathname === '/health') return health(env)
     if (request.method !== 'POST') return json({ error: 'not_found' }, 404)
+    if (!knownPostRoute(url.pathname)) {
+      // Intentionally no /v1/chat/completions route: ElevenLabs owns the live LLM runtime.
+      return json({ error: 'not_found' }, 404)
+    }
 
-    if (url.pathname === '/twilio/inbound') return handleVoice(request, env, 'inbound')
+    let runtime: RuntimeEnv
+    try {
+      runtime = await hydrateEnv(env)
+    } catch {
+      return json({ ok: false, error: 'secrets_unavailable' }, 503)
+    }
+
+    if (url.pathname === '/twilio/inbound') return handleVoice(request, runtime, 'inbound')
     if (url.pathname === '/twilio/outbound') {
       if ((request.headers.get('content-type') ?? '').toLowerCase().includes('application/json')) {
-        return handleOutboundAdmin(request, env)
+        return handleOutboundAdmin(request, runtime)
       }
-      return handleVoice(request, env, 'outbound')
+      return handleVoice(request, runtime, 'outbound')
     }
-    if (url.pathname === '/twilio/status') return handleStatus(request, env)
-    if (url.pathname === '/twilio/amd') return handleAmd(request, env)
-    if (TOOL_ROUTES.has(url.pathname)) return handleElevenLabsTool(request, env, url.pathname)
-    if (url.pathname === '/elevenlabs/webhooks/post-call') return handlePostCall(request, env)
+    if (url.pathname === '/twilio/status') return handleStatus(request, runtime)
+    if (url.pathname === '/twilio/amd') return handleAmd(request, runtime)
+    if (TOOL_ROUTES.has(url.pathname)) return handleElevenLabsTool(request, runtime, url.pathname)
+    if (url.pathname === '/elevenlabs/webhooks/post-call') return handlePostCall(request, runtime)
 
-    // Intentionally no /v1/chat/completions route: ElevenLabs owns the live LLM runtime.
     return json({ error: 'not_found' }, 404)
   },
 
   async queue(batch: QueueBatch<PostCallQueueMessage>, env: Env): Promise<void> {
+    let runtime: RuntimeEnv
+    try {
+      runtime = await hydrateEnv(env)
+    } catch {
+      for (const message of batch.messages) message.retry?.()
+      return
+    }
+
     for (const message of batch.messages) {
       try {
-        await processPostCallMessage(message.body, env)
+        await processPostCallMessage(message.body, runtime)
         message.ack?.()
       } catch {
         message.retry?.()
