@@ -8,8 +8,9 @@ This repository is a historical/source snapshot for Caroline components that sti
 
 - The live Worker is managed directly in Cloudflare.
 - Deployment is through Cloudflare Dashboard/Quick Edit or a standalone local Wrangler copy.
-- Cloudflare Worker Secrets and dashboard-managed bindings/variables are authoritative for the Worker runtime.
-- Twilio Console, ElevenLabs dashboard/API, and the database provider remain authoritative for their respective production configuration.
+- Provider/application/database secrets are authoritative in Infisical Development and are delivered at runtime through `secrets-gateway`, scoped by Worker.
+- Caroline application Workers may hold only `GATEWAY_TOKEN` and `GATEWAY_URL` as Cloudflare secrets; bindings and non-secret variables remain dashboard/Wrangler-managed.
+- Twilio Console, ElevenLabs dashboard/API, and the database provider remain authoritative for their respective non-secret production configuration and resources.
 - No push, branch, pull request, hosted CI workflow, repository secret, or repository-connected Cloudflare Build is part of the Caroline Phone deployment path.
 - Standalone Caroline Phone source backups should be stored outside any Git working tree and must not contain secret values.
 

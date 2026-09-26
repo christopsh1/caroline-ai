@@ -7,6 +7,9 @@ workers_dev = true
 [observability]
 enabled = true
 
+[vars]
+WORKER_NAME = "caroline-event-worker"
+
 [[kv_namespaces]]
 binding = "CAROLINE_PHONE"
 id = "85679a0030e846ee931226aa1a6e6332"

@@ -48,7 +48,9 @@ The direct module deploy path remains useful for small generated Workers that do
 ## Safety model
 
 - `/mcp` requires `Authorization: Bearer <MCP_GATEWAY_TOKEN>`.
-- If `MCP_GATEWAY_TOKEN` is not present, the MCP endpoint fails closed with `503 gateway_locked`.
+- `MCP_GATEWAY_TOKEN` is not a direct Cloudflare Worker secret; it is resolved from Infisical through `secrets-gateway` for `WORKER_NAME=caroline-mcp`.
+- If the secrets gateway is unavailable, the entrypoint fails closed with `503 secrets_unavailable`.
+- If the hydrated `MCP_GATEWAY_TOKEN` is absent, the existing MCP endpoint authorization remains locked.
 - Read tools do not require per-call mutation approval.
 - Create/edit/delete/cancel/run/configuration tools require `confirm_write=true`.
 - The generic `cloudflare_api_execute` surface is always treated as privileged/write-capable.
@@ -56,7 +58,7 @@ The direct module deploy path remains useful for small generated Workers that do
 
 ## Runtime credentials
 
-The deployed Worker expects four runtime values:
+All runtime credentials live in Infisical Development and are delivered through `secrets-gateway` with per-worker scoping. The `caroline-mcp` gateway response may contain the runtime values needed by the control plane, including:
 
 ```text
 MCP_GATEWAY_TOKEN
@@ -65,14 +67,25 @@ CLOUDFLARE_BUILDS_TOKEN
 CLOUDFLARE_ACCOUNT_ID
 ```
 
-Keep the tokens separate:
+Fallback Cloudflare authentication shapes supported by the existing control-plane modules can also be hydrated when explicitly tagged for `caroline-mcp`.
+
+The only two Cloudflare Worker secrets permitted on `caroline-mcp` are:
+
+```text
+GATEWAY_TOKEN
+GATEWAY_URL
+```
+
+`WORKER_NAME=caroline-mcp`, `ENVIRONMENT`, and `CLOUDFLARE_MCP_URL` are non-secret Worker variables.
+
+Keep the runtime credential purposes separate:
 
 - `MCP_GATEWAY_TOKEN` authenticates callers to Caroline MCP.
 - `CLOUDFLARE_CONTROL_TOKEN` is used for Workers Scripts management and the official Cloudflare API MCP.
-- `CLOUDFLARE_BUILDS_TOKEN` is used only for the Workers Builds REST API. Give it Workers Builds configuration permissions and, when GitHub installation discovery is needed, the user-scoped permission required by Cloudflare.
-- `CLOUDFLARE_ACCOUNT_ID` identifies the account and is supplied to the runtime without hard-coding it into source.
+- `CLOUDFLARE_BUILDS_TOKEN` is used only for the Workers Builds REST API.
+- `CLOUDFLARE_ACCOUNT_ID` identifies the account.
 
-Do not commit token values.
+Do not commit secret values or bulk-upload these runtime credentials directly to the Worker.
 
 ## Provisioning
 
@@ -84,20 +97,16 @@ The ordinary deployment workflow is:
 
 It validates the service on pull requests and deploys only `caroline-mcp` after changes land on `main`.
 
-Dedicated runtime secrets are provisioned by:
+The deployment workflow intentionally does **not** run `wrangler secret bulk` for provider/application/runtime credentials. Before cutover, the live Worker must already have only `GATEWAY_TOKEN` and `GATEWAY_URL` configured as its Cloudflare secrets, and Infisical must have the required `caroline-mcp`-tagged runtime secret set.
 
-```text
-.github/workflows/provision-caroline-mcp-runtime.yml
-```
-
-That workflow intentionally refuses to run if any dedicated runtime secret is missing and then deploys `caroline-mcp` with those Worker secrets. It does not reuse `CLOUDFLARE_API_TOKEN` as the runtime management token.
+Deployment-process Cloudflare credentials used by CI are separate from Worker runtime credentials and must never be uploaded to `caroline-mcp` as runtime secrets.
 
 ## Endpoints
 
-- `GET /health` — public service health/status without secret values
+- `GET /health` — public service health/status without secret values; the entrypoint first resolves the worker-scoped runtime secret set
 - `/mcp` — authenticated stateless Streamable HTTP MCP endpoint
 
-The health response exposes whether the gateway, Workers control token, and Workers Builds token are configured, but never returns their values.
+The health response exposes whether the hydrated MCP gateway and Cloudflare control surfaces are configured, but never returns credential values.
 
 ## Full Cloudflare API
 

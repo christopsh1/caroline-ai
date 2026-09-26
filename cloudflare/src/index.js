@@ -1,3 +1,22 @@
+// Required Caroline secrets-gateway bootstrap.
+// Cloudflare secret bindings permitted on this Worker: GATEWAY_TOKEN and GATEWAY_URL only.
+let _secrets = null
+async function getSecrets(env) {
+  if (_secrets) return _secrets
+  if (!env.GATEWAY_URL || !env.GATEWAY_TOKEN || !env.WORKER_NAME) {
+    throw new Error('secrets_gateway_not_configured')
+  }
+  const resp = await fetch(
+    `${env.GATEWAY_URL.replace(/\/+$/, '')}/secrets?worker=${encodeURIComponent(env.WORKER_NAME)}`,
+    { headers: { Authorization: `Bearer ${env.GATEWAY_TOKEN}` } },
+  )
+  if (!resp.ok) throw new Error(`Secrets gateway error: ${resp.status}`)
+  const data = await resp.json()
+  if (!data.ok) throw new Error(`Secrets gateway: ${data.error}`)
+  _secrets = data.secrets
+  return _secrets
+}
+
 const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8' }
 
 function json(data, status = 200) {
@@ -62,6 +81,7 @@ export default {
           ok: true,
           service: 'caroline-event-worker',
           timestamp: new Date().toISOString(),
+          secrets_gateway_configured: Boolean(env.GATEWAY_URL && env.GATEWAY_TOKEN && env.WORKER_NAME),
           bindings: {
             kv: Boolean(env.CAROLINE_PHONE),
             queue: Boolean(env.EVENT_DELIVERY),

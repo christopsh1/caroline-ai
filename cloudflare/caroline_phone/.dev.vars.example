@@ -1,14 +1,6 @@
-# LOCAL DEVELOPMENT ONLY. Copy to .dev.vars outside source control and supply values locally.
-# Production and staging values belong in Cloudflare Worker Secrets, not repository variables.
+# LOCAL DEVELOPMENT ONLY. Copy to .dev.vars outside source control.
+# Caroline provider/database credentials stay in Infisical Development.
+# Local Workers receive only the two secrets-gateway access values below.
 
-TWILIO_ACCOUNT_SID=
-TWILIO_AUTH_TOKEN=
-TWILIO_FROM_NUMBER=
-OUTBOUND_ADMIN_TOKEN=
-ELEVENLABS_API_KEY=
-ELEVENLABS_TOOL_SECRET=
-ELEVENLABS_WEBHOOK_SECRET=
-ACTION_CONFIRMATION_SECRET=
-CAROLINE_BACKEND_URL=
-CAROLINE_BACKEND_TOKEN=
-CAROLINE_PHONE_PUBLIC_URL=
+GATEWAY_TOKEN=
+GATEWAY_URL=
