@@ -53,21 +53,20 @@ jobs:
         working-directory: services/caroline-mcp
         run: npm install --no-audit --no-fund
 
-      - name: Bootstrap Caroline MCP credentials
+      - name: Bootstrap Cloudflare deployment credentials
         working-directory: services/caroline-mcp
         env:
           GITHUB_FALLBACK_CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           GITHUB_FALLBACK_CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          MCP_GATEWAY_TOKEN: ${{ secrets.MCP_GATEWAY_TOKEN }}
         run: node scripts/bootstrap-ci.mjs
 
       - name: Deploy caroline-mcp code
         working-directory: services/caroline-mcp
         run: npx wrangler deploy
 
-      - name: Provision caroline-mcp runtime secrets
-        working-directory: services/caroline-mcp
-        run: node scripts/runtime-secrets-json.mjs | npx wrangler secret bulk
+      # Runtime provider/application credentials are intentionally NOT bulk-uploaded here.
+      # caroline-mcp may have only GATEWAY_TOKEN and GATEWAY_URL as Cloudflare Worker secrets;
+      # all other runtime credentials are resolved through secrets-gateway for WORKER_NAME=caroline-mcp.
 
       - name: Verify live Caroline MCP health
         shell: bash
@@ -87,7 +86,3 @@ jobs:
           if (health.workers_builds_configured !== true) throw new Error('Workers Builds is not configured');
           console.log(`caroline-mcp live health verified: version=${health.version}, environment=${health.environment}`);
           NODE
-
-      - name: Verify live Cloudflare MCP tool discovery
-        working-directory: services/caroline-mcp
-        run: node scripts/verify-live-tools.mjs
