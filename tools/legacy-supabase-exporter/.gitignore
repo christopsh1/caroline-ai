@@ -1,0 +1,7 @@
+.venv/
+.archive-staging/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.parquet
+*.jsonl.gz
