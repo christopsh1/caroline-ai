@@ -48,3 +48,7 @@ Do not automatically apply snapshot files to production. For Caroline Phone spec
 ## Cloudflare MCP
 
 The project-level `.mcp.json` remains a development convenience for other Caroline work. It is not part of the Caroline Phone production runtime or deployment path.
+
+## Context7 MCP
+
+`.mcp.json` also declares a `context7` server pointing at the official remote endpoint `https://mcp.context7.com/mcp`, giving MCP-aware tools (for example `resolve-library-id` and `query-docs`) live access to up-to-date library and GitHub repo documentation. Replace the `Authorization` header placeholder in `.mcp.json` with your own Context7 API key formatted as an HTTP bearer credential, and never commit a real key. This repo file cannot configure a separate tool's personal config (such as Codex CLI's `~/.codex/config.toml`, which lives on your own machine outside this repository) — set that up locally yourself, using the same URL and header shown here.
