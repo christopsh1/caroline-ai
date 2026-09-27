@@ -1,0 +1,64 @@
+{
+  "mcpServers": {
+    "github": {
+      "type": "streamable-http",
+      "enabled": true,
+      "url": "https://api.githubcopilot.com/mcp/",
+      "namespace": "github",
+      "readOnly": false,
+      "prefixTools": true,
+      "toolFilter": ["*"],
+      "resourceFilter": ["*"],
+      "promptFilter": ["*"],
+      "timeout": 15
+    },
+    "cloudflare-bindings": {
+      "type": "streamable-http",
+      "enabled": true,
+      "url": "https://bindings.mcp.cloudflare.com/mcp",
+      "namespace": "cloudflare",
+      "readOnly": false,
+      "prefixTools": true,
+      "toolFilter": ["*"],
+      "resourceFilter": ["*"],
+      "promptFilter": ["*"],
+      "timeout": 15
+    },
+    "elevenlabs": {
+      "type": "streamable-http",
+      "enabled": true,
+      "url": "https://api.elevenlabs.io/v1/mcp",
+      "namespace": "elevenlabs",
+      "readOnly": false,
+      "prefixTools": true,
+      "toolFilter": ["*"],
+      "resourceFilter": ["*"],
+      "promptFilter": ["*"],
+      "timeout": 15
+    },
+    "supabase": {
+      "type": "streamable-http",
+      "enabled": true,
+      "url": "https://mcp.supabase.com/mcp",
+      "namespace": "supabase",
+      "readOnly": false,
+      "prefixTools": true,
+      "toolFilter": ["*"],
+      "resourceFilter": ["*"],
+      "promptFilter": ["*"],
+      "timeout": 15
+    },
+    "neon": {
+      "type": "streamable-http",
+      "enabled": true,
+      "url": "https://mcp.neon.tech/mcp",
+      "namespace": "neon",
+      "readOnly": false,
+      "prefixTools": true,
+      "toolFilter": ["*"],
+      "resourceFilter": ["*"],
+      "promptFilter": ["*"],
+      "timeout": 15
+    }
+  }
+}
