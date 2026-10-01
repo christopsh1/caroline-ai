@@ -45,6 +45,10 @@ The copy under `cloudflare/caroline_phone/` is transitional/reference material o
 
 Do not automatically apply snapshot files to production. For Caroline Phone specifically, follow `cloudflare/caroline_phone/README.md` and use direct Cloudflare deployment only.
 
+## Tooling references
+
+- [OpenCode + GitHub Copilot](docs/tooling/opencode-copilot.md) — Marketplace integration, setup notes, and Caroline-specific usage guidance.
+
 ## Cloudflare MCP
 
 The project-level `.mcp.json` remains a development convenience for other Caroline work. It is not part of the Caroline Phone production runtime or deployment path.
