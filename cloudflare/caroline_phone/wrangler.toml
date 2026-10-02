@@ -9,6 +9,7 @@ enabled = true
 
 [vars]
 ENVIRONMENT = "production"
+CAROLINE_TENANT_KEY = "caroline"
 ELEVENLABS_INBOUND_AGENT_ID = "agent_8001m2ba4rmder6t7wq270ntj43j"
 ELEVENLABS_OUTBOUND_AGENT_ID = "agent_0501m31c1xv6e40ayeab7bn67vet"
 CAROLINE_PHONE_PUBLIC_URL = "https://caroline-phone.customerservice-882.workers.dev"
@@ -31,6 +32,10 @@ queue = "caroline-post-call"
 max_batch_size = 5
 max_batch_timeout = 5
 max_retries = 5
+
+[[r2_buckets]]
+binding = "CAROLINE_TRANSCRIPTS"
+bucket_name = "caroline-transcripts"
 
 [exports.CallSession]
 type = "durable-object"

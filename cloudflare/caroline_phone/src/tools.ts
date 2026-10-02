@@ -1,14 +1,21 @@
 import { getCallSession, type CallSessionBinding, type CallSessionState } from './call-session'
+import { queryOne, queryRows, requireTenantId, sha256Hex, vectorLiteral, type DatabaseEnv } from './database'
+import { embedSearchQuery, PRODUCTION_EMBEDDING, type EmbeddingEnv } from './embeddings'
 
-export type ToolEnv = {
+export type ToolEnv = DatabaseEnv & EmbeddingEnv & {
   ELEVENLABS_TOOL_SECRET?: string
-  CAROLINE_BACKEND_URL?: string
-  CAROLINE_BACKEND_TOKEN?: string
-  ACTION_CONFIRMATION_SECRET?: string
+  TWILIO_ACCOUNT_SID?: string
+  TWILIO_AUTH_TOKEN?: string
   CALL_SESSION: CallSessionBinding
 }
 
 type Json = Record<string, unknown>
+
+type ToolContext = {
+  tenantId: string
+  session: CallSessionState
+  externalPhone?: string
+}
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -30,10 +37,6 @@ function cleanString(value: unknown, max = 1000): string | undefined {
   return cleaned ? cleaned.slice(0, max) : undefined
 }
 
-function cleanBool(value: unknown): boolean | undefined {
-  return typeof value === 'boolean' ? value : undefined
-}
-
 function cleanObject(value: unknown, maxBytes = 4096): Json | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const encoded = JSON.stringify(value)
@@ -41,140 +44,34 @@ function cleanObject(value: unknown, maxBytes = 4096): Json | undefined {
   return value as Json
 }
 
-function modelSafeSession(session: CallSessionState) {
-  return {
-    call_context_id: session.call_context_id,
-    direction: session.direction,
-    selected_agent_id: session.selected_agent_id,
-    caller_phone_hint: session.from_number,
-    destination_phone: session.to_number,
-  }
+function externalPartyPhone(session: CallSessionState): string | undefined {
+  return session.direction === 'outbound' ? session.to_number : session.from_number
 }
 
-async function backendRequest(env: ToolEnv, path: string, payload: Json): Promise<{ status: number; body: Json }> {
-  if (!env.CAROLINE_BACKEND_URL || !env.CAROLINE_BACKEND_TOKEN) {
-    return { status: 503, body: { ok: false, error: 'backend_not_configured' } }
-  }
-
-  const base = env.CAROLINE_BACKEND_URL.replace(/\/$/, '')
-  let response: Response
-  try {
-    response = await fetch(`${base}${path}`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${env.CAROLINE_BACKEND_TOKEN}`,
-        'content-type': 'application/json',
-        accept: 'application/json',
-      },
-      body: JSON.stringify(payload),
-    })
-  } catch {
-    return { status: 502, body: { ok: false, error: 'backend_unavailable' } }
-  }
-
-  let body: Json = {}
-  try {
-    body = (await response.json()) as Json
-  } catch {
-    body = { ok: false, error: 'invalid_backend_response' }
-  }
-  return { status: response.status, body }
+function validIso(value: unknown): string | undefined {
+  const text = cleanString(value, 80)
+  if (!text) return undefined
+  const millis = Date.parse(text)
+  return Number.isFinite(millis) ? new Date(millis).toISOString() : undefined
 }
 
-const encoder = new TextEncoder()
-
-async function hmacHex(secret: string, value: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  )
-  const signature = new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(value)))
-  return Array.from(signature, (byte) => byte.toString(16).padStart(2, '0')).join('')
+function base64Url(bytes: Uint8Array): string {
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
 }
 
-function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  let diff = 0
-  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return diff === 0
+function randomToken(): string {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return base64Url(bytes)
 }
 
-async function issueConfirmationToken(env: ToolEnv, callContextId: string, actionId: string, ttlSeconds = 120) {
-  if (!env.ACTION_CONFIRMATION_SECRET) throw new Error('confirmation_secret_not_configured')
-  const expiresAt = Math.floor(Date.now() / 1000) + ttlSeconds
-  const payload = `${callContextId}.${actionId}.${expiresAt}`
-  const signature = await hmacHex(env.ACTION_CONFIRMATION_SECRET, payload)
-  return { token: `${expiresAt}.${signature}`, expires_at: expiresAt }
-}
-
-async function verifyConfirmationToken(
+async function parseToolRequest(
+  request: Request,
   env: ToolEnv,
-  callContextId: string,
-  actionId: string,
-  token: string,
-): Promise<boolean> {
-  if (!env.ACTION_CONFIRMATION_SECRET) return false
-  const [expiresRaw, supplied] = token.split('.', 2)
-  const expiresAt = Number(expiresRaw)
-  if (!Number.isInteger(expiresAt) || !supplied || expiresAt < Math.floor(Date.now() / 1000)) return false
-  if (expiresAt > Math.floor(Date.now() / 1000) + 10 * 60) return false
-  const expected = await hmacHex(env.ACTION_CONFIRMATION_SECRET, `${callContextId}.${actionId}.${expiresAt}`)
-  return constantTimeEqual(expected, supplied.toLowerCase())
-}
-
-function safeCustomer(body: Json) {
-  const identityStatus = cleanString(body.identity_status, 64) ?? 'unverified'
-  if (identityStatus !== 'verified') {
-    return {
-      identity_status: identityStatus,
-      verification_required: cleanBool(body.verification_required) ?? true,
-      protected_data_disclosed: false,
-    }
-  }
-  return {
-    identity_status: 'verified',
-    display_name: cleanString(body.display_name, 120),
-    access_tier: cleanString(body.access_tier, 80),
-    relationship_summary: cleanString(body.relationship_summary, 500),
-    verification_required: false,
-    protected_data_disclosed: true,
-  }
-}
-
-function safeKnowledge(body: Json) {
-  const source = Array.isArray(body.results) ? body.results : []
-  const results = source.slice(0, 5).map((row) => {
-    const item = row && typeof row === 'object' ? (row as Json) : {}
-    return {
-      title: cleanString(item.title, 160),
-      snippet: cleanString(item.snippet, 1200),
-      source_type: cleanString(item.source_type, 80),
-    }
-  })
-  return { results }
-}
-
-function safeAvailability(body: Json) {
-  const source = Array.isArray(body.windows) ? body.windows : []
-  const windows = source.slice(0, 8).map((row) => {
-    const item = row && typeof row === 'object' ? (row as Json) : {}
-    return {
-      start: cleanString(item.start, 80),
-      end: cleanString(item.end, 80),
-      status: cleanString(item.status, 40),
-    }
-  })
-  return {
-    status: cleanString(body.status, 80),
-    timezone: cleanString(body.timezone, 80),
-    windows,
-  }
-}
-
-async function parseToolRequest(request: Request, env: ToolEnv): Promise<{ body: Json; session: CallSessionState } | Response> {
+): Promise<{ body: Json; context: ToolContext; startedAt: number } | Response> {
+  const startedAt = Date.now()
   if (!authorized(request, env.ELEVENLABS_TOOL_SECRET)) return json({ ok: false, error: 'unauthorized' }, 401)
 
   let body: Json
@@ -185,87 +82,534 @@ async function parseToolRequest(request: Request, env: ToolEnv): Promise<{ body:
   }
 
   const callContextId = cleanString(body.call_context_id, 128) ?? ''
-  if (!callContextId) return json({ ok: false, error: 'call_context_id_required' }, 400)
+  if (!callContextId || !/^[A-Za-z0-9_-]{20,128}$/.test(callContextId)) {
+    return json({ ok: false, error: 'call_context_id_required' }, 400)
+  }
 
   const session = await getCallSession(env.CALL_SESSION, callContextId)
   if (!session) return json({ ok: false, error: 'call_context_not_found' }, 404)
   if (session.expires_at && Date.parse(session.expires_at) <= Date.now()) {
     return json({ ok: false, error: 'call_context_expired' }, 410)
   }
-  return { body, session }
+
+  let tenantId: string
+  try {
+    tenantId = await requireTenantId(env)
+  } catch {
+    return json({ ok: false, error: 'database_not_configured' }, 503)
+  }
+
+  return {
+    body,
+    context: { tenantId, session, externalPhone: externalPartyPhone(session) },
+    startedAt,
+  }
+}
+
+async function auditTool(
+  env: ToolEnv,
+  context: ToolContext,
+  toolName: string,
+  resultStatus: string,
+  startedAt: number,
+  details: Json = {},
+): Promise<void> {
+  try {
+    await queryRows(
+      env,
+      `insert into tool_audit_events
+         (tenant_id, call_context_id, tool_name, authorization_result, result_status, latency_ms, details_safe)
+       values ($1::uuid, $2, $3, 'authorized', $4, $5, $6::jsonb)`,
+      [
+        context.tenantId,
+        context.session.call_context_id,
+        toolName,
+        resultStatus,
+        Math.max(0, Date.now() - startedAt),
+        JSON.stringify(details),
+      ],
+    )
+  } catch {
+    // Tool execution must fail closed on policy/data errors, but audit transport must not leak internals to the model.
+  }
+}
+
+type CustomerRow = {
+  customer_id: string
+  display_name: string | null
+  notes_safe: string | null
+  calendar_share_level: string | null
+  relationship_disclosure_allowed: boolean | null
+  verified: boolean
+}
+
+async function customerLookup(env: ToolEnv, context: ToolContext, startedAt: number): Promise<Response> {
+  if (!context.externalPhone) {
+    await auditTool(env, context, 'customer_lookup', 'no_phone', startedAt)
+    return json({ ok: true, caller: { identity_status: 'unknown', verification_required: true, protected_data_disclosed: false } })
+  }
+
+  const row = await queryOne<CustomerRow>(
+    env,
+    `select c.id::text as customer_id,
+            c.display_name,
+            c.notes_safe,
+            cp.calendar_share_level,
+            cp.relationship_disclosure_allowed,
+            exists (
+              select 1
+                from verification_sessions vs
+               where vs.tenant_id = $1::uuid
+                 and vs.call_context_id = $3
+                 and vs.customer_id = c.id
+                 and vs.status = 'verified'
+                 and vs.expires_at > now()
+            ) as verified
+       from caller_identity_links cil
+       join customers c
+         on c.id = cil.customer_id
+        and c.tenant_id = cil.tenant_id
+       left join contact_preferences cp
+         on cp.tenant_id = c.tenant_id
+        and cp.customer_id = c.id
+      where cil.tenant_id = $1::uuid
+        and cil.identifier_type = 'phone'
+        and cil.normalized_value = $2
+        and cil.revoked_at is null
+        and c.status = 'active'
+      limit 1`,
+    [context.tenantId, context.externalPhone, context.session.call_context_id],
+  )
+
+  if (!row) {
+    await auditTool(env, context, 'customer_lookup', 'unknown', startedAt)
+    return json({ ok: true, caller: { identity_status: 'unknown', verification_required: true, protected_data_disclosed: false } })
+  }
+
+  if (!row.verified) {
+    await auditTool(env, context, 'customer_lookup', 'verification_required', startedAt, { customer_match: true })
+    return json({
+      ok: true,
+      caller: {
+        identity_status: 'candidate',
+        verification_required: true,
+        protected_data_disclosed: false,
+      },
+    })
+  }
+
+  await queryRows(
+    env,
+    `update call_contexts
+        set customer_id = $3::uuid,
+            identity_status = 'verified',
+            access_tier = 'known_contact_verified',
+            updated_at = now()
+      where tenant_id = $1::uuid
+        and call_context_id = $2`,
+    [context.tenantId, context.session.call_context_id, row.customer_id],
+  )
+
+  await auditTool(env, context, 'customer_lookup', 'verified', startedAt, { customer_match: true })
+  return json({
+    ok: true,
+    caller: {
+      identity_status: 'verified',
+      display_name: row.display_name ?? undefined,
+      access_tier: 'known_contact_verified',
+      relationship_summary: row.relationship_disclosure_allowed ? row.notes_safe ?? undefined : undefined,
+      calendar_share_level: row.calendar_share_level ?? 'none',
+      verification_required: false,
+      protected_data_disclosed: true,
+    },
+  })
+}
+
+type KnowledgeRow = {
+  id: string
+  title: string
+  content: string
+  score: number | string
+}
+
+async function searchKnowledge(env: ToolEnv, context: ToolContext, body: Json, startedAt: number): Promise<Response> {
+  const query = cleanString(body.query, 500)
+  if (!query) return json({ ok: false, error: 'query_required' }, 400)
+
+  const embedding = await embedSearchQuery(env, query)
+  const vector = vectorLiteral(embedding, PRODUCTION_EMBEDDING.dimensions)
+  const rows = await queryRows<KnowledgeRow>(
+    env,
+    `select kc.id::text as id,
+            kd.title,
+            kc.content,
+            1 - (kc.embedding <=> $2::vector) as score
+       from knowledge_chunks kc
+       join knowledge_documents kd
+         on kd.id = kc.document_id
+        and kd.tenant_id = kc.tenant_id
+      where kc.tenant_id = $1::uuid
+        and kd.status = 'active'
+        and kc.embedding is not null
+        and kc.embedding_provider = $3
+        and kc.embedding_model = $4
+        and kc.embedding_version = $5
+        and kc.embedding_dimensions = $6
+      order by kc.embedding <=> $2::vector
+      limit 5`,
+    [
+      context.tenantId,
+      vector,
+      PRODUCTION_EMBEDDING.provider,
+      PRODUCTION_EMBEDDING.model,
+      PRODUCTION_EMBEDDING.version,
+      PRODUCTION_EMBEDDING.dimensions,
+    ],
+  )
+
+  const queryHash = await sha256Hex(query)
+  const ids = rows.map((row) => row.id)
+  const scores = rows.map((row) => Number(row.score)).filter(Number.isFinite)
+  await queryRows(
+    env,
+    `insert into rag_retrieval_audit
+       (tenant_id, call_context_id, query_sha256, provider, model, embedding_version, dimensions, input_type, top_k, result_chunk_ids, result_scores, latency_ms)
+     values ($1::uuid, $2, $3, $4, $5, $6, $7, $8, 5, $9::uuid[], $10::double precision[], $11)`,
+    [
+      context.tenantId,
+      context.session.call_context_id,
+      queryHash,
+      PRODUCTION_EMBEDDING.provider,
+      PRODUCTION_EMBEDDING.model,
+      PRODUCTION_EMBEDDING.version,
+      PRODUCTION_EMBEDDING.dimensions,
+      PRODUCTION_EMBEDDING.queryInputType,
+      ids,
+      scores,
+      Math.max(0, Date.now() - startedAt),
+    ],
+  )
+
+  await auditTool(env, context, 'search_knowledge', 'success', startedAt, { result_count: rows.length })
+  return json({
+    ok: true,
+    results: rows.map((row) => ({
+      title: row.title,
+      snippet: row.content.slice(0, 1200),
+      source_type: 'knowledge',
+      score: Number(row.score),
+    })),
+  })
+}
+
+type AvailabilityRow = { starts_at: string; ends_at: string }
+
+async function getAvailability(env: ToolEnv, context: ToolContext, startedAt: number): Promise<Response> {
+  const rows = await queryRows<AvailabilityRow>(
+    env,
+    `select starts_at::text, ends_at::text
+       from availability_slots
+      where tenant_id = $1::uuid
+        and status = 'available'
+        and starts_at >= now()
+        and starts_at < now() + interval '30 days'
+        and (expires_at is null or expires_at > now())
+      order by starts_at
+      limit 8`,
+    [context.tenantId],
+  )
+  await auditTool(env, context, 'get_availability', 'success', startedAt, { result_count: rows.length })
+  return json({
+    ok: true,
+    status: rows.length ? 'available' : 'no_published_availability',
+    timezone: 'America/New_York',
+    windows: rows.map((row) => ({ start: row.starts_at, end: row.ends_at, status: 'available' })),
+  })
+}
+
+type VerificationRow = { customer_id: string }
+
+async function verifiedCustomerId(env: ToolEnv, context: ToolContext): Promise<string | null> {
+  const row = await queryOne<VerificationRow>(
+    env,
+    `select customer_id::text
+       from verification_sessions
+      where tenant_id = $1::uuid
+        and call_context_id = $2
+        and status = 'verified'
+        and customer_id is not null
+        and expires_at > now()
+      order by verified_at desc nulls last, created_at desc
+      limit 1`,
+    [context.tenantId, context.session.call_context_id],
+  )
+  return row?.customer_id ?? null
+}
+
+async function prepareAction(env: ToolEnv, context: ToolContext, body: Json, startedAt: number): Promise<Response> {
+  const actionType = cleanString(body.action_type, 80)
+  const action = cleanObject(body.action, 4096)
+  if (!actionType || !action) return json({ ok: false, error: 'action_required' }, 400)
+
+  let canonical: Json
+  let summary: string
+
+  if (actionType === 'callback_request') {
+    if (!context.externalPhone) return json({ ok: false, error: 'callback_phone_unavailable' }, 409)
+    canonical = {
+      requested_for: validIso(action.requested_for),
+      reason_safe: cleanString(action.reason, 500),
+    }
+    summary = canonical.requested_for
+      ? `Request a callback for ${String(canonical.requested_for)}.`
+      : 'Request a callback at the caller’s verified call-back number.'
+  } else if (actionType === 'appointment_request') {
+    const customerId = await verifiedCustomerId(env, context)
+    if (!customerId) return json({ ok: false, error: 'verified_identity_required' }, 403)
+    const startsAt = validIso(action.starts_at)
+    const endsAt = validIso(action.ends_at)
+    if (!startsAt || !endsAt || Date.parse(endsAt) <= Date.parse(startsAt)) {
+      return json({ ok: false, error: 'valid_appointment_window_required' }, 400)
+    }
+    canonical = {
+      customer_id: customerId,
+      starts_at: startsAt,
+      ends_at: endsAt,
+      title_safe: cleanString(action.title, 160) ?? 'Appointment',
+    }
+    summary = `Schedule ${String(canonical.title_safe)} from ${startsAt} to ${endsAt}.`
+  } else if (actionType === 'transfer_request') {
+    const destinationKey = cleanString(action.destination_key, 80)
+    if (!destinationKey) return json({ ok: false, error: 'destination_key_required' }, 400)
+    const destination = await queryOne<{ id: string; display_name: string }>(
+      env,
+      `select id::text as id, display_name
+         from transfer_destinations
+        where tenant_id = $1::uuid
+          and destination_key = $2
+          and active = true
+        limit 1`,
+      [context.tenantId, destinationKey],
+    )
+    if (!destination) return json({ ok: false, error: 'transfer_destination_not_authorized' }, 403)
+    canonical = { destination_key: destinationKey }
+    summary = `Transfer this call to ${destination.display_name}.`
+  } else {
+    return json({ ok: false, error: 'unsupported_action_type' }, 400)
+  }
+
+  const token = randomToken()
+  const tokenHash = await sha256Hex(token)
+  const row = await queryOne<{ action_id: string; expires_at: string }>(
+    env,
+    `insert into confirmation_tokens
+       (tenant_id, call_context_id, action_type, action_payload, token_hash, summary_safe, expires_at)
+     values ($1::uuid, $2, $3, $4::jsonb, $5, $6, now() + interval '2 minutes')
+     returning action_id::text, expires_at::text`,
+    [context.tenantId, context.session.call_context_id, actionType, JSON.stringify(canonical), tokenHash, summary],
+  )
+  if (!row) return json({ ok: false, error: 'prepare_failed' }, 500)
+
+  await auditTool(env, context, 'prepare_action', 'prepared', startedAt, { action_type: actionType })
+  return json({
+    ok: true,
+    action_id: row.action_id,
+    summary,
+    requires_explicit_confirmation: true,
+    confirmation_token: token,
+    confirmation_expires_at: row.expires_at,
+  })
+}
+
+type ClaimedAction = { action_type: string; action_payload: Json }
+
+async function claimAction(
+  env: ToolEnv,
+  context: ToolContext,
+  actionId: string,
+  token: string,
+): Promise<ClaimedAction | null> {
+  const tokenHash = await sha256Hex(token)
+  return queryOne<ClaimedAction>(
+    env,
+    `update confirmation_tokens
+        set consumed_at = now()
+      where tenant_id = $1::uuid
+        and call_context_id = $2
+        and action_id = $3::uuid
+        and token_hash = $4
+        and consumed_at is null
+        and expires_at > now()
+      returning action_type, action_payload`,
+    [context.tenantId, context.session.call_context_id, actionId, tokenHash],
+  )
+}
+
+async function commitNonTransferAction(
+  env: ToolEnv,
+  context: ToolContext,
+  claimed: ClaimedAction,
+): Promise<{ status: string; reference: string; summary: string }> {
+  const payload = claimed.action_payload
+
+  if (claimed.action_type === 'callback_request') {
+    if (!context.externalPhone) throw new Error('callback_phone_unavailable')
+    const row = await queryOne<{ id: string }>(
+      env,
+      `insert into callbacks
+         (tenant_id, call_context_id, normalized_phone, requested_for, reason_safe)
+       values ($1::uuid, $2, $3, $4::timestamptz, $5)
+       returning id::text`,
+      [
+        context.tenantId,
+        context.session.call_context_id,
+        context.externalPhone,
+        payload.requested_for ?? null,
+        payload.reason_safe ?? null,
+      ],
+    )
+    if (!row) throw new Error('callback_create_failed')
+    return { status: 'requested', reference: row.id, summary: 'Callback request recorded.' }
+  }
+
+  if (claimed.action_type === 'appointment_request') {
+    const row = await queryOne<{ id: string }>(
+      env,
+      `insert into appointments
+         (tenant_id, customer_id, call_context_id, title_safe, starts_at, ends_at, status)
+       values ($1::uuid, $2::uuid, $3, $4, $5::timestamptz, $6::timestamptz, 'scheduled')
+       returning id::text`,
+      [
+        context.tenantId,
+        payload.customer_id,
+        context.session.call_context_id,
+        payload.title_safe,
+        payload.starts_at,
+        payload.ends_at,
+      ],
+    )
+    if (!row) throw new Error('appointment_create_failed')
+    return { status: 'scheduled', reference: row.id, summary: 'Appointment scheduled.' }
+  }
+
+  throw new Error('unsupported_committed_action')
+}
+
+async function executeTransfer(
+  env: ToolEnv,
+  context: ToolContext,
+  claimed: ClaimedAction,
+): Promise<{ status: string; reference: string; summary: string }> {
+  if (claimed.action_type !== 'transfer_request') throw new Error('prepared_action_is_not_transfer')
+  if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN) throw new Error('twilio_transfer_not_configured')
+
+  const destinationKey = cleanString(claimed.action_payload.destination_key, 80)
+  const destination = destinationKey
+    ? await queryOne<{ id: string; e164_phone: string }>(
+      env,
+      `select id::text as id, e164_phone
+         from transfer_destinations
+        where tenant_id = $1::uuid
+          and destination_key = $2
+          and active = true
+        limit 1`,
+      [context.tenantId, destinationKey],
+    )
+    : null
+  if (!destination || !/^\+[1-9]\d{7,14}$/.test(destination.e164_phone)) {
+    throw new Error('transfer_destination_not_authorized')
+  }
+
+  const transfer = await queryOne<{ id: string }>(
+    env,
+    `insert into transfers
+       (tenant_id, call_context_id, destination_id, status, twilio_call_sid)
+     values ($1::uuid, $2, $3::uuid, 'executing', $4)
+     returning id::text`,
+    [context.tenantId, context.session.call_context_id, destination.id, context.session.call_sid],
+  )
+  if (!transfer) throw new Error('transfer_create_failed')
+
+  const twiml = `<Response><Dial>${destination.e164_phone}</Dial></Response>`
+  const params = new URLSearchParams({ Twiml: twiml })
+  const response = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(env.TWILIO_ACCOUNT_SID)}/Calls/${encodeURIComponent(context.session.call_sid)}.json`,
+    {
+      method: 'POST',
+      headers: {
+        authorization: `Basic ${btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`)}`,
+        'content-type': 'application/x-www-form-urlencoded',
+        accept: 'application/json',
+      },
+      body: params.toString(),
+    },
+  )
+
+  if (!response.ok) {
+    await queryRows(
+      env,
+      `update transfers set status = 'failed', failure_reason = $3, updated_at = now()
+        where tenant_id = $1::uuid and id = $2::uuid`,
+      [context.tenantId, transfer.id, `twilio_${response.status}`],
+    )
+    throw new Error('twilio_transfer_failed')
+  }
+
+  return { status: 'transfer_started', reference: transfer.id, summary: 'Transfer started.' }
+}
+
+async function commitAction(
+  env: ToolEnv,
+  context: ToolContext,
+  body: Json,
+  startedAt: number,
+  transferOnly: boolean,
+): Promise<Response> {
+  const actionId = cleanString(body.action_id, 160)
+  const token = cleanString(body.confirmation_token, 512)
+  const confirmed = body.confirmed === true
+  if (!actionId || !token || !confirmed) return json({ ok: false, error: 'explicit_confirmation_required' }, 409)
+  if (!/^[0-9a-fA-F-]{36}$/.test(actionId)) return json({ ok: false, error: 'invalid_action_id' }, 400)
+
+  const claimed = await claimAction(env, context, actionId, token)
+  if (!claimed) return json({ ok: false, error: 'invalid_expired_or_consumed_confirmation' }, 409)
+
+  try {
+    const result = transferOnly
+      ? await executeTransfer(env, context, claimed)
+      : await commitNonTransferAction(env, context, claimed)
+    await auditTool(env, context, transferOnly ? 'transfer' : 'commit_action', result.status, startedAt, {
+      action_type: claimed.action_type,
+    })
+    return json({ ok: true, ...result })
+  } catch (error) {
+    const code = error instanceof Error ? error.message : 'action_failed'
+    await auditTool(env, context, transferOnly ? 'transfer' : 'commit_action', 'failed', startedAt, {
+      action_type: claimed.action_type,
+      error_code: code.slice(0, 120),
+    })
+    return json({ ok: false, error: code }, 502)
+  }
 }
 
 export async function handleElevenLabsTool(request: Request, env: ToolEnv, pathname: string): Promise<Response> {
   const parsed = await parseToolRequest(request, env)
   if (parsed instanceof Response) return parsed
-  const { body, session } = parsed
-  const context = modelSafeSession(session)
+  const { body, context, startedAt } = parsed
 
-  if (pathname === '/elevenlabs/tools/customer-lookup') {
-    const verification = cleanObject(body.verification, 2048)
-    const result = await backendRequest(env, '/tools/customer-lookup', { context, verification })
-    if (result.status >= 400) return json({ ok: false, error: cleanString(result.body.error, 120) ?? 'backend_error' }, result.status)
-    return json({ ok: true, caller: safeCustomer(result.body) })
-  }
-
-  if (pathname === '/elevenlabs/tools/search-knowledge') {
-    const query = cleanString(body.query, 500)
-    if (!query) return json({ ok: false, error: 'query_required' }, 400)
-    const result = await backendRequest(env, '/tools/search-knowledge', { context, query })
-    if (result.status >= 400) return json({ ok: false, error: cleanString(result.body.error, 120) ?? 'backend_error' }, result.status)
-    return json({ ok: true, ...safeKnowledge(result.body) })
-  }
-
-  if (pathname === '/elevenlabs/tools/get-availability') {
-    const requestText = cleanString(body.request, 500)
-    const result = await backendRequest(env, '/tools/get-availability', { context, request: requestText })
-    if (result.status >= 400) return json({ ok: false, error: cleanString(result.body.error, 120) ?? 'backend_error' }, result.status)
-    return json({ ok: true, ...safeAvailability(result.body) })
-  }
-
-  if (pathname === '/elevenlabs/tools/prepare-action') {
-    const actionType = cleanString(body.action_type, 80)
-    const action = cleanObject(body.action, 4096)
-    if (!actionType || !action) return json({ ok: false, error: 'action_required' }, 400)
-    const result = await backendRequest(env, '/tools/prepare-action', { context, action_type: actionType, action })
-    if (result.status >= 400) return json({ ok: false, error: cleanString(result.body.error, 120) ?? 'backend_error' }, result.status)
-    const actionId = cleanString(result.body.action_id, 160)
-    const summary = cleanString(result.body.summary, 800)
-    if (!actionId || !summary) return json({ ok: false, error: 'invalid_prepare_response' }, 502)
-    try {
-      const confirmation = await issueConfirmationToken(env, session.call_context_id, actionId)
-      return json({
-        ok: true,
-        action_id: actionId,
-        summary,
-        requires_explicit_confirmation: true,
-        confirmation_token: confirmation.token,
-        confirmation_expires_at: confirmation.expires_at,
-      })
-    } catch {
-      return json({ ok: false, error: 'confirmation_not_configured' }, 503)
-    }
-  }
-
-  if (pathname === '/elevenlabs/tools/commit-action' || pathname === '/elevenlabs/tools/transfer') {
-    const actionId = cleanString(body.action_id, 160)
-    const token = cleanString(body.confirmation_token, 512)
-    const confirmed = body.confirmed === true
-    if (!actionId || !token || !confirmed) return json({ ok: false, error: 'explicit_confirmation_required' }, 409)
-    if (!(await verifyConfirmationToken(env, session.call_context_id, actionId, token))) {
-      return json({ ok: false, error: 'invalid_or_expired_confirmation' }, 409)
-    }
-
-    const backendPath = pathname.endsWith('/transfer') ? '/tools/transfer' : '/tools/commit-action'
-    const result = await backendRequest(env, backendPath, { context, action_id: actionId, confirmed: true })
-    if (result.status >= 400) return json({ ok: false, error: cleanString(result.body.error, 120) ?? 'backend_error' }, result.status)
-    return json({
-      ok: result.body.ok !== false,
-      status: cleanString(result.body.status, 80) ?? 'completed',
-      reference: cleanString(result.body.reference, 160),
-      summary: cleanString(result.body.summary, 800),
+  try {
+    if (pathname === '/elevenlabs/tools/customer-lookup') return customerLookup(env, context, startedAt)
+    if (pathname === '/elevenlabs/tools/search-knowledge') return searchKnowledge(env, context, body, startedAt)
+    if (pathname === '/elevenlabs/tools/get-availability') return getAvailability(env, context, startedAt)
+    if (pathname === '/elevenlabs/tools/prepare-action') return prepareAction(env, context, body, startedAt)
+    if (pathname === '/elevenlabs/tools/commit-action') return commitAction(env, context, body, startedAt, false)
+    if (pathname === '/elevenlabs/tools/transfer') return commitAction(env, context, body, startedAt, true)
+    return json({ ok: false, error: 'tool_not_found' }, 404)
+  } catch (error) {
+    const code = error instanceof Error ? error.message : 'tool_failed'
+    await auditTool(env, context, pathname.split('/').at(-1) ?? 'unknown', 'failed', startedAt, {
+      error_code: code.slice(0, 120),
     })
+    return json({ ok: false, error: code }, code.includes('missing') || code.includes('configured') ? 503 : 500)
   }
-
-  return json({ ok: false, error: 'tool_not_found' }, 404)
 }

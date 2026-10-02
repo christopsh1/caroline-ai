@@ -4,10 +4,20 @@ import {
   patchCallSession,
   patchCallSessionByContext,
   type CallSessionBinding,
+  type CallSessionState,
 } from './call-session'
 import { registerElevenLabsCall, runtimeForDirection } from './elevenlabs'
 import { verifyElevenLabsWebhook } from './elevenlabs-security'
 import { claimEvent, EventLedger, releaseEvent, type EventLedgerBinding } from './event-ledger'
+import {
+  markPostCallFailure,
+  outboundAllowed,
+  persistCallContext,
+  persistCallLifecycleEvent,
+  persistPostCall,
+  type PostCallQueueMessage,
+  type R2BucketLike,
+} from './persistence'
 import { handleElevenLabsTool } from './tools'
 import { verifyTwilioFormRequest } from './twilio-security'
 
@@ -28,14 +38,6 @@ type QueueBatch<T> = {
   messages: Array<QueueMessage<T>>
 }
 
-type PostCallQueueMessage = {
-  event_id: string
-  type: string
-  conversation_id: string
-  call_context_id?: string
-  event_timestamp?: number | string
-}
-
 export type Env = {
   TWILIO_ACCOUNT_SID?: string
   TWILIO_AUTH_TOKEN?: string
@@ -44,9 +46,9 @@ export type Env = {
   ELEVENLABS_API_KEY?: string
   ELEVENLABS_TOOL_SECRET?: string
   ELEVENLABS_WEBHOOK_SECRET?: string
-  ACTION_CONFIRMATION_SECRET?: string
-  CAROLINE_BACKEND_URL?: string
-  CAROLINE_BACKEND_TOKEN?: string
+  OPENAI_API_KEY?: string
+  DATABASE_URL?: string
+  CAROLINE_TENANT_KEY?: string
   CAROLINE_PHONE_PUBLIC_URL?: string
   CALL_CONTEXT_TTL_SECONDS?: string
   ENVIRONMENT?: string
@@ -55,6 +57,7 @@ export type Env = {
   CALL_SESSION: CallSessionBinding
   EVENT_LEDGER?: EventLedgerBinding
   POST_CALL_QUEUE?: QueueBinding
+  CAROLINE_TRANSCRIPTS?: R2BucketLike
 }
 
 const FALLBACK_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response><Say>Sorry, this line is temporarily unavailable.</Say><Hangup/></Response>'
@@ -108,6 +111,14 @@ async function verifiedTwilioForm(request: Request, env: Env): Promise<{ raw: st
   return { raw, params: new URLSearchParams(raw) }
 }
 
+async function bestEffortPersistContext(env: Env, session: CallSessionState): Promise<void> {
+  try {
+    await persistCallContext(env, session)
+  } catch {
+    // Inbound telephony stays available in a safe, database-degraded mode. Protected tools fail closed.
+  }
+}
+
 async function handleVoice(request: Request, env: Env, direction: 'inbound' | 'outbound'): Promise<Response> {
   const verified = await verifiedTwilioForm(request, env)
   if (!verified) return json({ error: 'forbidden' }, 403)
@@ -132,16 +143,11 @@ async function handleVoice(request: Request, env: Env, direction: 'inbound' | 'o
       from_number: fromNumber,
       to_number: toNumber,
       register_status: 'registering',
+      call_status: existing?.call_status,
+      answered_by: existing?.answered_by,
       expires_at: existing?.expires_at ?? expiresAt(env),
     })
-
-    await patchCallSession(env.CALL_SESSION, callSid, {
-      direction,
-      selected_agent_id: runtime.agentId,
-      from_number: fromNumber,
-      to_number: toNumber,
-      register_status: 'registering',
-    })
+    await bestEffortPersistContext(env, mapping)
 
     const twiml = await registerElevenLabsCall(env as Parameters<typeof registerElevenLabsCall>[0], {
       call_sid: callSid,
@@ -151,10 +157,11 @@ async function handleVoice(request: Request, env: Env, direction: 'inbound' | 'o
       to_number: toNumber,
     })
 
-    await patchCallSession(env.CALL_SESSION, callSid, {
+    const registered = await patchCallSession(env.CALL_SESSION, callSid, {
       register_status: 'registered',
       registered_at: new Date().toISOString(),
     })
+    await bestEffortPersistContext(env, registered)
 
     // Register Call returns TwiML. Return it byte-for-byte to Twilio.
     return xml(twiml)
@@ -162,7 +169,7 @@ async function handleVoice(request: Request, env: Env, direction: 'inbound' | 'o
     try {
       await patchCallSession(env.CALL_SESSION, callSid, { register_status: 'register_failed' })
     } catch {
-      // The safe telephony fallback must still be returned even if persistence is unavailable.
+      // The safe telephony fallback must still be returned even if state is unavailable.
     }
     return xml(FALLBACK_TWIML)
   }
@@ -178,11 +185,27 @@ function e164(value: unknown): string | null {
   return /^\+[1-9]\d{7,14}$/.test(trimmed) ? trimmed : null
 }
 
+async function cancelTwilioCall(env: Env, callSid: string): Promise<void> {
+  if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN) return
+  await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(env.TWILIO_ACCOUNT_SID)}/Calls/${encodeURIComponent(callSid)}.json`,
+    {
+      method: 'POST',
+      headers: {
+        authorization: `Basic ${btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`)}`,
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ Status: 'completed' }).toString(),
+    },
+  )
+}
+
 async function handleOutboundAdmin(request: Request, env: Env): Promise<Response> {
   if (!outboundAdminAuthorized(request, env)) return json({ ok: false, error: 'unauthorized' }, 401)
   if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_FROM_NUMBER) {
     return json({ ok: false, error: 'twilio_outbound_not_configured' }, 503)
   }
+  if (!env.DATABASE_URL) return json({ ok: false, error: 'database_not_configured' }, 503)
 
   let body: Record<string, unknown>
   try {
@@ -194,6 +217,14 @@ async function handleOutboundAdmin(request: Request, env: Env): Promise<Response
   const to = e164(body.to)
   const from = e164(env.TWILIO_FROM_NUMBER)
   if (!to || !from) return json({ ok: false, error: 'valid_e164_number_required' }, 400)
+
+  let allowed = false
+  try {
+    allowed = await outboundAllowed(env, to)
+  } catch {
+    return json({ ok: false, error: 'outbound_policy_unavailable' }, 503)
+  }
+  if (!allowed) return json({ ok: false, error: 'outbound_contact_blocked' }, 409)
 
   const callContextId = crypto.randomUUID()
   const origin = (env.CAROLINE_PHONE_PUBLIC_URL ?? new URL(request.url).origin).replace(/\/$/, '')
@@ -234,11 +265,9 @@ async function handleOutboundAdmin(request: Request, env: Env): Promise<Response
     twilioBody = {}
   }
   const callSid = typeof twilioBody.sid === 'string' ? twilioBody.sid : ''
-  if (!twilioResponse.ok || !callSid) {
-    return json({ ok: false, error: 'twilio_call_create_failed' }, 502)
-  }
+  if (!twilioResponse.ok || !callSid) return json({ ok: false, error: 'twilio_call_create_failed' }, 502)
 
-  await createCallMapping(env.CALL_SESSION, {
+  const mapping = await createCallMapping(env.CALL_SESSION, {
     call_context_id: callContextId,
     call_sid: callSid,
     direction: 'outbound',
@@ -249,6 +278,13 @@ async function handleOutboundAdmin(request: Request, env: Env): Promise<Response
     call_status: typeof twilioBody.status === 'string' ? twilioBody.status : 'queued',
     expires_at: expiresAt(env),
   })
+
+  try {
+    await persistCallContext(env, mapping)
+  } catch {
+    await cancelTwilioCall(env, callSid).catch(() => undefined)
+    return json({ ok: false, error: 'outbound_audit_persistence_failed' }, 503)
+  }
 
   return json({ ok: true, call_context_id: callContextId, call_sid: callSid, status: twilioBody.status ?? 'queued' }, 202)
 }
@@ -262,10 +298,11 @@ async function handleStatus(request: Request, env: Env): Promise<Response> {
   if (!callSid || !callStatus) return json({ error: 'invalid_twilio_payload' }, 400)
 
   try {
-    await patchCallSession(env.CALL_SESSION, callSid, { call_status: callStatus })
+    const state = await patchCallSession(env.CALL_SESSION, callSid, { call_status: callStatus })
+    await persistCallLifecycleEvent(env, state, 'status', `${callSid}:status:${callStatus}`, { call_status: callStatus })
     return new Response(null, { status: 204 })
   } catch {
-    return json({ error: 'state_unavailable' }, 503)
+    return json({ error: 'state_or_database_unavailable' }, 503)
   }
 }
 
@@ -278,10 +315,11 @@ async function handleAmd(request: Request, env: Env): Promise<Response> {
   if (!callSid || !answeredBy) return json({ error: 'invalid_twilio_payload' }, 400)
 
   try {
-    await patchCallSession(env.CALL_SESSION, callSid, { answered_by: answeredBy })
+    const state = await patchCallSession(env.CALL_SESSION, callSid, { answered_by: answeredBy })
+    await persistCallLifecycleEvent(env, state, 'amd', `${callSid}:amd:${answeredBy}`, { answered_by: answeredBy })
     return new Response(null, { status: 204 })
   } catch {
-    return json({ error: 'state_unavailable' }, 503)
+    return json({ error: 'state_or_database_unavailable' }, 503)
   }
 }
 
@@ -345,7 +383,7 @@ async function handlePostCall(request: Request, env: Env): Promise<Response> {
         elevenlabs_conversation_id: conversationId,
       })
     } catch {
-      // The post-call payload is still queued; correlation can be reconciled asynchronously.
+      // Correlation can be reconciled by the queue consumer.
     }
   }
 
@@ -368,9 +406,7 @@ async function handlePostCall(request: Request, env: Env): Promise<Response> {
 }
 
 async function processPostCallMessage(message: PostCallQueueMessage, env: Env): Promise<void> {
-  if (!env.ELEVENLABS_API_KEY || !env.CAROLINE_BACKEND_URL || !env.CAROLINE_BACKEND_TOKEN) {
-    throw new Error('post_call_consumer_not_configured')
-  }
+  if (!env.ELEVENLABS_API_KEY || !env.DATABASE_URL) throw new Error('post_call_consumer_not_configured')
   if (!message.conversation_id || message.conversation_id === 'unknown') throw new Error('conversation_id_missing')
 
   const conversationResponse = await fetch(
@@ -378,18 +414,11 @@ async function processPostCallMessage(message: PostCallQueueMessage, env: Env): 
     { headers: { 'xi-api-key': env.ELEVENLABS_API_KEY, accept: 'application/json' } },
   )
   if (!conversationResponse.ok) throw new Error(`elevenlabs_conversation_${conversationResponse.status}`)
-  const conversation = await conversationResponse.json()
+  const conversation = await conversationResponse.json() as Record<string, unknown>
 
-  const backendResponse = await fetch(`${env.CAROLINE_BACKEND_URL.replace(/\/$/, '')}/post-call/process`, {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${env.CAROLINE_BACKEND_TOKEN}`,
-      'content-type': 'application/json',
-      accept: 'application/json',
-    },
-    body: JSON.stringify({ ...message, conversation }),
-  })
-  if (!backendResponse.ok) throw new Error(`post_call_backend_${backendResponse.status}`)
+  let session: CallSessionState | null = null
+  if (message.call_context_id) session = await getCallSession(env.CALL_SESSION, message.call_context_id)
+  await persistPostCall(env, message, conversation, session)
 }
 
 async function health(env: Env): Promise<Response> {
@@ -400,14 +429,16 @@ async function health(env: Env): Promise<Response> {
     conversational_runtime: 'elevenlabs-native',
     live_model_proxy: false,
     openrouter_live_path: false,
+    system_of_record: 'neon-postgres',
     inbound_agent_configured: Boolean(env.ELEVENLABS_INBOUND_AGENT_ID),
     outbound_agent_configured: Boolean(env.ELEVENLABS_OUTBOUND_AGENT_ID),
     elevenlabs_api_secret_configured: Boolean(env.ELEVENLABS_API_KEY),
     twilio_secret_configured: Boolean(env.TWILIO_AUTH_TOKEN),
     outbound_trigger_configured: Boolean(env.TWILIO_ACCOUNT_SID && env.TWILIO_FROM_NUMBER && env.OUTBOUND_ADMIN_TOKEN),
     tool_auth_configured: Boolean(env.ELEVENLABS_TOOL_SECRET),
-    backend_configured: Boolean(env.CAROLINE_BACKEND_URL && env.CAROLINE_BACKEND_TOKEN),
-    confirmation_secret_configured: Boolean(env.ACTION_CONFIRMATION_SECRET),
+    database_configured: Boolean(env.DATABASE_URL),
+    embedding_provider_configured: Boolean(env.OPENAI_API_KEY),
+    transcript_archive_configured: Boolean(env.CAROLINE_TRANSCRIPTS),
     post_call_webhook_configured: Boolean(env.ELEVENLABS_WEBHOOK_SECRET && env.EVENT_LEDGER && env.POST_CALL_QUEUE),
   })
 }
@@ -440,7 +471,9 @@ export default {
       try {
         await processPostCallMessage(message.body, env)
         message.ack?.()
-      } catch {
+      } catch (error) {
+        const code = error instanceof Error ? error.message : 'post_call_failed'
+        await markPostCallFailure(env, message.body, code)
         message.retry?.()
       }
     }
