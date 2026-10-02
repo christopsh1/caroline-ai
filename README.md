@@ -48,6 +48,7 @@ Do not automatically apply snapshot files to production. For Caroline Phone spec
 ## Tooling references
 
 - [OpenCode + GitHub Copilot](docs/tooling/opencode-copilot.md) — Marketplace integration, setup notes, and Caroline-specific usage guidance.
+- [Desktop Commander MCP](docs/tooling/desktop-commander.md) — terminal/filesystem MCP, remote-device access, setup notes, and Caroline operations guidance.
 
 ## Cloudflare MCP
 
