@@ -1,12 +1,56 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { after, beforeEach } from 'node:test'
 import worker, { type Env } from '../src/index'
 import { expectedTwilioSignature } from '../src/twilio-security'
 
 const TWILIO_TOKEN = '12345'
 const TOOL_SECRET = 'tool-secret'
 const WEBHOOK_SECRET = 'webhook-secret'
+const GATEWAY_TOKEN = 'gateway-test-token'
+const GATEWAY_URL = 'https://gateway.example'
 const TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response><Connect><Stream url="wss://example.invalid" /></Connect></Response>'
+
+const TEST_SECRETS = {
+  TWILIO_ACCOUNT_SID: 'AC123',
+  TWILIO_AUTH_TOKEN: TWILIO_TOKEN,
+  TWILIO_FROM_NUMBER: '+15550000002',
+  OUTBOUND_ADMIN_TOKEN: 'admin-secret',
+  ELEVENLABS_API_KEY: 'test-elevenlabs-key',
+  ELEVENLABS_TOOL_SECRET: TOOL_SECRET,
+  ELEVENLABS_WEBHOOK_SECRET: WEBHOOK_SECRET,
+  ACTION_CONFIRMATION_SECRET: 'confirmation-secret',
+  CAROLINE_BACKEND_TOKEN: 'backend-secret',
+}
+
+const realFetch = globalThis.fetch
+let gatewayAvailable = true
+let upstreamFetch: typeof fetch = realFetch
+
+function inputUrl(input: RequestInfo | URL): string {
+  return typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+}
+
+globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const url = inputUrl(input)
+  if (url === `${GATEWAY_URL}/secrets?worker=caroline-phone`) {
+    if (!gatewayAvailable) return new Response('unavailable', { status: 503 })
+    const auth = new Headers(init?.headers).get('authorization')
+    assert.equal(auth, `Bearer ${GATEWAY_TOKEN}`)
+    return Response.json({ ok: true, secrets: TEST_SECRETS })
+  }
+  return upstreamFetch(input, init)
+}) as typeof fetch
+
+beforeEach(() => {
+  gatewayAvailable = true
+  upstreamFetch = (async (input: RequestInfo | URL) => {
+    throw new Error(`unexpected upstream request: ${inputUrl(input)}`)
+  }) as typeof fetch
+})
+
+after(() => {
+  globalThis.fetch = realFetch
+})
 
 function makeStateBinding() {
   const states = new Map<string, any>()
@@ -74,16 +118,10 @@ function makeQueue() {
 
 function makeEnv(callBinding: ReturnType<typeof makeStateBinding>['binding']): Env {
   return {
-    TWILIO_ACCOUNT_SID: 'AC123',
-    TWILIO_AUTH_TOKEN: TWILIO_TOKEN,
-    TWILIO_FROM_NUMBER: '+15550000002',
-    OUTBOUND_ADMIN_TOKEN: 'admin-secret',
-    ELEVENLABS_API_KEY: 'test-elevenlabs-key',
-    ELEVENLABS_TOOL_SECRET: TOOL_SECRET,
-    ELEVENLABS_WEBHOOK_SECRET: WEBHOOK_SECRET,
-    ACTION_CONFIRMATION_SECRET: 'confirmation-secret',
+    GATEWAY_TOKEN,
+    GATEWAY_URL,
+    WORKER_NAME: 'caroline-phone',
     CAROLINE_BACKEND_URL: 'https://backend.example',
-    CAROLINE_BACKEND_TOKEN: 'backend-secret',
     CAROLINE_PHONE_PUBLIC_URL: 'https://phone.example',
     ELEVENLABS_INBOUND_AGENT_ID: 'agent_inbound',
     ELEVENLABS_OUTBOUND_AGENT_ID: 'agent_outbound',
@@ -115,6 +153,18 @@ test('matches Twilio official HMAC-SHA1 form vector', async () => {
   assert.equal(signature, 'L/OH5YylLD5NRKLltdqwSvS0BnU=')
 })
 
+test('fails closed when the secrets gateway is unavailable', async () => {
+  const store = makeStateBinding()
+  gatewayAvailable = false
+  const request = await signedTwilioRequest('https://phone.example/twilio/inbound', {
+    CallSid: 'CA_GATEWAY_DOWN', From: '+15550000001', To: '+15550000002',
+  })
+  const response = await worker.fetch(request, makeEnv(store.binding))
+  assert.equal(response.status, 503)
+  assert.deepEqual(await response.json(), { ok: false, error: 'secrets_unavailable' })
+  assert.equal(store.states.size, 0)
+})
+
 test('rejects unsigned Twilio requests before state or ElevenLabs work', async () => {
   const store = makeStateBinding()
   const request = new Request('https://phone.example/twilio/inbound', {
@@ -128,102 +178,91 @@ test('rejects unsigned Twilio requests before state or ElevenLabs work', async (
 
 test('inbound returns ElevenLabs-produced TwiML, uses native agent registration, and passes only call_context_id', async () => {
   const store = makeStateBinding()
-  const previousFetch = globalThis.fetch
   const registerBodies: any[] = []
   const upstreamUrls: string[] = []
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+  upstreamFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = inputUrl(input)
     upstreamUrls.push(url)
     registerBodies.push(JSON.parse(String(init?.body ?? '{}')))
     return new Response(TWIML, { status: 200 })
   }) as typeof fetch
 
-  try {
-    for (let i = 0; i < 2; i += 1) {
-      const request = await signedTwilioRequest('https://phone.example/twilio/inbound', {
-        CallSid: 'CA_INBOUND', From: '+15550000001', To: '+15550000002',
-      })
-      const response = await worker.fetch(request, makeEnv(store.binding))
-      assert.equal(response.status, 200)
-      assert.equal(await response.text(), TWIML)
-    }
-    assert.equal(registerBodies[0].agent_id, 'agent_inbound')
-    assert.equal(registerBodies[0].direction, 'inbound')
-    assert.equal('branch_id' in registerBodies[0].conversation_initiation_client_data, false)
-    const firstVars = registerBodies[0].conversation_initiation_client_data.dynamic_variables
-    const secondVars = registerBodies[1].conversation_initiation_client_data.dynamic_variables
-    assert.deepEqual(Object.keys(firstVars), ['call_context_id'])
-    assert.equal(firstVars.call_context_id, secondVars.call_context_id)
-    assert.ok(store.states.has(firstVars.call_context_id))
-    assert.deepEqual(upstreamUrls, [
-      'https://api.elevenlabs.io/v1/convai/twilio/register-call',
-      'https://api.elevenlabs.io/v1/convai/twilio/register-call',
-    ])
-  } finally { globalThis.fetch = previousFetch }
+  for (let i = 0; i < 2; i += 1) {
+    const request = await signedTwilioRequest('https://phone.example/twilio/inbound', {
+      CallSid: 'CA_INBOUND', From: '+15550000001', To: '+15550000002',
+    })
+    const response = await worker.fetch(request, makeEnv(store.binding))
+    assert.equal(response.status, 200)
+    assert.equal(await response.text(), TWIML)
+  }
+  assert.equal(registerBodies[0].agent_id, 'agent_inbound')
+  assert.equal(registerBodies[0].direction, 'inbound')
+  assert.equal('branch_id' in registerBodies[0].conversation_initiation_client_data, false)
+  const firstVars = registerBodies[0].conversation_initiation_client_data.dynamic_variables
+  const secondVars = registerBodies[1].conversation_initiation_client_data.dynamic_variables
+  assert.deepEqual(Object.keys(firstVars), ['call_context_id'])
+  assert.equal(firstVars.call_context_id, secondVars.call_context_id)
+  assert.ok(store.states.has(firstVars.call_context_id))
+  assert.deepEqual(upstreamUrls, [
+    'https://api.elevenlabs.io/v1/convai/twilio/register-call',
+    'https://api.elevenlabs.io/v1/convai/twilio/register-call',
+  ])
 })
 
 test('outbound signed Twilio leg uses the dedicated ElevenLabs outbound agent', async () => {
   const store = makeStateBinding()
-  const previousFetch = globalThis.fetch
   let registerBody: any = null
-  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+  upstreamFetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
     registerBody = JSON.parse(String(init?.body ?? '{}'))
     return new Response(TWIML, { status: 200 })
   }) as typeof fetch
-  try {
-    const request = await signedTwilioRequest('https://phone.example/twilio/outbound', {
-      CallSid: 'CA_OUTBOUND', From: '+15550000002', To: '+15550000003',
-    })
-    assert.equal((await worker.fetch(request, makeEnv(store.binding))).status, 200)
-    assert.equal(registerBody.agent_id, 'agent_outbound')
-    assert.equal(registerBody.direction, 'outbound')
-  } finally { globalThis.fetch = previousFetch }
+
+  const request = await signedTwilioRequest('https://phone.example/twilio/outbound', {
+    CallSid: 'CA_OUTBOUND', From: '+15550000002', To: '+15550000003',
+  })
+  assert.equal((await worker.fetch(request, makeEnv(store.binding))).status, 200)
+  assert.equal(registerBody.agent_id, 'agent_outbound')
+  assert.equal(registerBody.direction, 'outbound')
 })
 
 test('authorized outbound admin trigger creates a Twilio call with AMD and Cloudflare callback', async () => {
   const store = makeStateBinding()
-  const previousFetch = globalThis.fetch
   let twilioBody = ''
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+  upstreamFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = inputUrl(input)
     assert.match(url, /api\.twilio\.com\/2010-04-01\/Accounts\/AC123\/Calls\.json/)
     twilioBody = String(init?.body ?? '')
     return Response.json({ sid: 'CA_ADMIN', status: 'queued' })
   }) as typeof fetch
-  try {
-    const response = await worker.fetch(new Request('https://phone.example/twilio/outbound', {
-      method: 'POST',
-      headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' },
-      body: JSON.stringify({ to: '+15550000003' }),
-    }), makeEnv(store.binding))
-    assert.equal(response.status, 202)
-    const params = new URLSearchParams(twilioBody)
-    assert.equal(params.get('MachineDetection'), 'Enable')
-    assert.equal(params.get('AsyncAmd'), 'true')
-    assert.match(params.get('Url') ?? '', /\/twilio\/outbound\?call_context_id=/)
-    assert.equal(store.states.has('CA_ADMIN'), true)
-  } finally { globalThis.fetch = previousFetch }
+
+  const response = await worker.fetch(new Request('https://phone.example/twilio/outbound', {
+    method: 'POST',
+    headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' },
+    body: JSON.stringify({ to: '+15550000003' }),
+  }), makeEnv(store.binding))
+  assert.equal(response.status, 202)
+  const params = new URLSearchParams(twilioBody)
+  assert.equal(params.get('MachineDetection'), 'Enable')
+  assert.equal(params.get('AsyncAmd'), 'true')
+  assert.match(params.get('Url') ?? '', /\/twilio\/outbound\?call_context_id=/)
+  assert.equal(store.states.has('CA_ADMIN'), true)
 })
 
-test('live phone worker exposes no chat-completions route and invokes no OpenRouter path', async () => {
+test('live phone worker exposes no chat-completions route and invokes no upstream path', async () => {
   const store = makeStateBinding()
-  const previousFetch = globalThis.fetch
   let called = false
-  globalThis.fetch = (async () => { called = true; throw new Error('unexpected upstream request') }) as typeof fetch
-  try {
-    const response = await worker.fetch(new Request('https://phone.example/v1/chat/completions', { method: 'POST', body: '{}' }), makeEnv(store.binding))
-    assert.equal(response.status, 404)
-    assert.equal(called, false)
-  } finally { globalThis.fetch = previousFetch }
+  upstreamFetch = (async () => { called = true; throw new Error('unexpected upstream request') }) as typeof fetch
+  const response = await worker.fetch(new Request('https://phone.example/v1/chat/completions', { method: 'POST', body: '{}' }), makeEnv(store.binding))
+  assert.equal(response.status, 404)
+  assert.equal(called, false)
 })
 
 test('ElevenLabs customer lookup can see only allow-listed backend fields', async () => {
   const store = makeStateBinding()
   const env = makeEnv(store.binding)
-  const previousFetch = globalThis.fetch
   let callContextId = ''
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+  upstreamFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = inputUrl(input)
     if (url.includes('/register-call')) {
       const body = JSON.parse(String(init?.body ?? '{}'))
       callContextId = body.conversation_initiation_client_data.dynamic_variables.call_context_id
@@ -238,33 +277,31 @@ test('ElevenLabs customer lookup can see only allow-listed backend fields', asyn
     }
     throw new Error(`unexpected ${url}`)
   }) as typeof fetch
-  try {
-    const inbound = await signedTwilioRequest('https://phone.example/twilio/inbound', {
-      CallSid: 'CA_TOOL', From: '+15550000001', To: '+15550000002',
-    })
-    assert.equal((await worker.fetch(inbound, env)).status, 200)
-    const allowed = await worker.fetch(new Request('https://phone.example/elevenlabs/tools/customer-lookup', {
-      method: 'POST',
-      headers: { 'x-caroline-tool-key': TOOL_SECRET, 'content-type': 'application/json' },
-      body: JSON.stringify({ call_context_id: callContextId }),
-    }), env)
-    assert.equal(allowed.status, 200)
-    const payload = await allowed.json() as any
-    assert.equal(payload.caller.display_name, 'Approved Name')
-    const serialized = JSON.stringify(payload)
-    assert.equal(serialized.includes('+1555'), false)
-    assert.equal(serialized.includes('must-not-leak'), false)
-    assert.equal(serialized.includes('service_role_key'), false)
-  } finally { globalThis.fetch = previousFetch }
+
+  const inbound = await signedTwilioRequest('https://phone.example/twilio/inbound', {
+    CallSid: 'CA_TOOL', From: '+15550000001', To: '+15550000002',
+  })
+  assert.equal((await worker.fetch(inbound, env)).status, 200)
+  const allowed = await worker.fetch(new Request('https://phone.example/elevenlabs/tools/customer-lookup', {
+    method: 'POST',
+    headers: { 'x-caroline-tool-key': TOOL_SECRET, 'content-type': 'application/json' },
+    body: JSON.stringify({ call_context_id: callContextId }),
+  }), env)
+  assert.equal(allowed.status, 200)
+  const payload = await allowed.json() as any
+  assert.equal(payload.caller.display_name, 'Approved Name')
+  const serialized = JSON.stringify(payload)
+  assert.equal(serialized.includes('+1555'), false)
+  assert.equal(serialized.includes('must-not-leak'), false)
+  assert.equal(serialized.includes('service_role_key'), false)
 })
 
 test('write actions require prepare + explicit confirmation + short-lived server token', async () => {
   const store = makeStateBinding()
   const env = makeEnv(store.binding)
-  const previousFetch = globalThis.fetch
   let callContextId = ''
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+  upstreamFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = inputUrl(input)
     if (url.includes('/register-call')) {
       const body = JSON.parse(String(init?.body ?? '{}'))
       callContextId = body.conversation_initiation_client_data.dynamic_variables.call_context_id
@@ -274,24 +311,23 @@ test('write actions require prepare + explicit confirmation + short-lived server
     if (url.endsWith('/tools/commit-action')) return Response.json({ ok: true, status: 'completed', reference: 'ref_123' })
     throw new Error(`unexpected ${url}`)
   }) as typeof fetch
-  try {
-    const inbound = await signedTwilioRequest('https://phone.example/twilio/inbound', { CallSid: 'CA_WRITE', From: '+15550000001', To: '+15550000002' })
-    await worker.fetch(inbound, env)
-    const headers = { 'x-caroline-tool-key': TOOL_SECRET, 'content-type': 'application/json' }
-    const prepared = await worker.fetch(new Request('https://phone.example/elevenlabs/tools/prepare-action', {
-      method: 'POST', headers, body: JSON.stringify({ call_context_id: callContextId, action_type: 'schedule', action: { when: 'tomorrow' } }),
-    }), env)
-    assert.equal(prepared.status, 200)
-    const prep = await prepared.json() as any
-    const denied = await worker.fetch(new Request('https://phone.example/elevenlabs/tools/commit-action', {
-      method: 'POST', headers, body: JSON.stringify({ call_context_id: callContextId, action_id: prep.action_id, confirmation_token: prep.confirmation_token, confirmed: false }),
-    }), env)
-    assert.equal(denied.status, 409)
-    const committed = await worker.fetch(new Request('https://phone.example/elevenlabs/tools/commit-action', {
-      method: 'POST', headers, body: JSON.stringify({ call_context_id: callContextId, action_id: prep.action_id, confirmation_token: prep.confirmation_token, confirmed: true }),
-    }), env)
-    assert.equal(committed.status, 200)
-  } finally { globalThis.fetch = previousFetch }
+
+  const inbound = await signedTwilioRequest('https://phone.example/twilio/inbound', { CallSid: 'CA_WRITE', From: '+15550000001', To: '+15550000002' })
+  await worker.fetch(inbound, env)
+  const headers = { 'x-caroline-tool-key': TOOL_SECRET, 'content-type': 'application/json' }
+  const prepared = await worker.fetch(new Request('https://phone.example/elevenlabs/tools/prepare-action', {
+    method: 'POST', headers, body: JSON.stringify({ call_context_id: callContextId, action_type: 'schedule', action: { when: 'tomorrow' } }),
+  }), env)
+  assert.equal(prepared.status, 200)
+  const prep = await prepared.json() as any
+  const denied = await worker.fetch(new Request('https://phone.example/elevenlabs/tools/commit-action', {
+    method: 'POST', headers, body: JSON.stringify({ call_context_id: callContextId, action_id: prep.action_id, confirmation_token: prep.confirmation_token, confirmed: false }),
+  }), env)
+  assert.equal(denied.status, 409)
+  const committed = await worker.fetch(new Request('https://phone.example/elevenlabs/tools/commit-action', {
+    method: 'POST', headers, body: JSON.stringify({ call_context_id: callContextId, action_id: prep.action_id, confirmation_token: prep.confirmation_token, confirmed: true }),
+  }), env)
+  assert.equal(committed.status, 200)
 })
 
 test('post-call events are HMAC-verified, idempotent, correlated, and queued once without transcript payload', async () => {

@@ -1,6 +1,6 @@
 import { appendFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { createHmac, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 
 const env = process.env;
 const checkOnly = process.argv.includes("--check");
@@ -156,30 +156,14 @@ console.log("Cloudflare account containing caroline-mcp resolved successfully.")
 
 if (checkOnly) process.exit(0);
 
+// These credentials are CI/deployment-process credentials only. They are not uploaded
+// as caroline-mcp Worker runtime secrets. Runtime credentials come from secrets-gateway.
 exportEnv("CLOUDFLARE_ACCOUNT_ID", accountId);
 
 if (auth.kind === "bearer") {
   exportEnv("CLOUDFLARE_API_TOKEN", auth.token);
-  exportEnv("CLOUDFLARE_CONTROL_TOKEN", nonempty(env.CLOUDFLARE_CONTROL_TOKEN) ?? auth.token);
-  exportEnv(
-    "CLOUDFLARE_BUILDS_TOKEN",
-    nonempty(env.CLOUDFLARE_BUILDS_TOKEN) ?? nonempty(env.CLOUDFLARE_CONTROL_TOKEN) ?? auth.token,
-  );
 } else {
   exportEnv("CLOUDFLARE_API_KEY", auth.key);
   exportEnv("CLOUDFLARE_API_EMAIL", auth.email);
   exportEnv("CLOUDFLARE_EMAIL", auth.email);
 }
-
-let gatewayToken = nonempty(env.MCP_GATEWAY_TOKEN);
-if (!gatewayToken) {
-  const seed = auth.kind === "bearer" ? auth.token : auth.key;
-  gatewayToken = createHmac("sha256", seed)
-    .update("caroline-mcp-gateway-token/v1", "utf8")
-    .digest("base64url");
-  mask(gatewayToken);
-  console.log("Using stable generated MCP gateway bearer token.");
-} else {
-  console.log("Using configured MCP gateway bearer token.");
-}
-exportEnv("MCP_GATEWAY_TOKEN", gatewayToken);

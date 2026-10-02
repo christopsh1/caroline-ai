@@ -51,16 +51,16 @@ npm run check
 npm run deploy
 ```
 
-Worker runtime secrets must be configured directly in Cloudflare and must not be stored in source files.
+## Secrets architecture
 
-Runtime secret names used by current Cloudflare components include:
+All provider/application/database secrets live in Infisical Development and are retrieved through the `secrets-gateway` Worker. Each application Worker is scoped by `WORKER_NAME` and may have only these two Cloudflare secret bindings:
 
-- `CAROLINE_KEY`
-- `CORE_RUNTIME_KEY`
-- `ELEVENLABS_API_KEY`
-- `ELEVENLABS_TOOL_SECRET`
-- `ELEVENLABS_WEBHOOK_SECRET`
-- `TWILIO_AUTH_TOKEN`
+- `GATEWAY_TOKEN`
+- `GATEWAY_URL`
+
+Do not place Twilio, ElevenLabs, Neon, OpenAI, Cohere, backend, or other provider credentials directly in Cloudflare Worker secrets or source files.
+
+For `caroline-event-worker`, the non-secret `WORKER_NAME` is `caroline-event-worker`. The gateway returns only secrets tagged for that Worker.
 
 Caroline Phone does not require or use an OpenRouter key in its live-call runtime.
 

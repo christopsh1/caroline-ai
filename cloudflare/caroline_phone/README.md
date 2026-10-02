@@ -82,33 +82,33 @@ Do not place raw database rows, credentials, verification secrets, complete hist
 - Twilio form callbacks verify `X-Twilio-Signature` before processing.
 - The outbound admin trigger requires `OUTBOUND_ADMIN_TOKEN` and validates E.164 numbers.
 - ElevenLabs tool routes require `ELEVENLABS_TOOL_SECRET` via Bearer auth or `X-Caroline-Tool-Key`.
-- Backend credentials stay in Cloudflare secrets. Tools send bounded server-side call context to the approved backend and return allow-listed model-safe fields only.
+- Provider/application credentials live in Infisical Development and are resolved at runtime through `secrets-gateway`; application Workers do not store those credentials directly as Cloudflare secrets.
+- Tools send bounded server-side call context to the approved backend and return allow-listed model-safe fields only.
 - `prepare-action` returns a short-lived HMAC confirmation token. `commit-action` and `transfer` require explicit `confirmed=true`, the prepared `action_id`, and a valid non-expired token.
 - Post-call webhooks verify `ElevenLabs-Signature` using HMAC-SHA256 over `timestamp.raw_body`, reject stale/bad signatures, and use `EVENT_LEDGER` for idempotency.
 - Queue messages contain only compact event/correlation metadata, not the transcript. The queue consumer fetches the full conversation from ElevenLabs asynchronously and sends it to the approved backend post-call processor.
 
-## Required Worker secrets
+## Secrets architecture
 
-Configure only in Cloudflare Worker Secrets:
+**Source of truth:** Infisical, Development environment, project `4643c8b4-eb45-45dd-87e4-80cdec6ae6ab`.
 
-- `TWILIO_ACCOUNT_SID`
-- `TWILIO_AUTH_TOKEN`
-- `TWILIO_FROM_NUMBER`
-- `OUTBOUND_ADMIN_TOKEN`
-- `ELEVENLABS_API_KEY`
-- `ELEVENLABS_TOOL_SECRET`
-- `ELEVENLABS_WEBHOOK_SECRET`
-- `ACTION_CONFIRMATION_SECRET`
-- `CAROLINE_BACKEND_URL`
-- `CAROLINE_BACKEND_TOKEN`
+**Runtime broker:** `secrets-gateway` Cloudflare Worker. The gateway scopes the returned secret set by `WORKER_NAME` and owns the 5-minute gateway cache.
 
-No OpenRouter secret is required by Caroline Phone.
+The only two Cloudflare secret bindings permitted on `caroline-phone` are:
 
-Non-secret Worker variables currently include:
+- `GATEWAY_TOKEN`
+- `GATEWAY_URL`
+
+Twilio, ElevenLabs, backend, Neon, OpenAI, Cohere, and other provider/application credentials must not be added directly as Cloudflare Worker secrets.
+
+Non-secret Worker variables include:
+- `WORKER_NAME=caroline-phone`
 - `ENVIRONMENT=production`
 - `CAROLINE_PHONE_PUBLIC_URL=https://caroline-phone.customerservice-882.workers.dev`
 - `CALL_CONTEXT_TTL_SECONDS=7200`
 - inbound/outbound ElevenLabs agent IDs
+
+The deployed source must call `getSecrets(env)`/the typed equivalent before any route that needs protected runtime credentials. Gateway failure is fail-closed; there is no hardcoded or direct-Cloudflare credential fallback.
 
 ## Cloudflare bindings
 
@@ -124,7 +124,7 @@ Caroline Phone has no Git-based deployment or validation workflow. Do not connec
 
 ### Cloudflare Dashboard
 
-Use Workers & Pages -> `caroline-phone` -> Edit Code / Quick Edit for direct code deployment when appropriate. Manage bindings, variables and secrets in Worker settings. Preserve the existing Worker name, routes, Durable Objects and production secrets.
+Use Workers & Pages -> `caroline-phone` -> Edit Code / Quick Edit for direct code deployment when appropriate. Manage bindings and non-secret variables in Worker settings. The only application Worker secrets allowed there are `GATEWAY_TOKEN` and `GATEWAY_URL`.
 
 If a source repository is connected under Settings -> Builds, select **Disconnect**. Disconnecting the build integration must not delete the existing Worker deployment.
 
